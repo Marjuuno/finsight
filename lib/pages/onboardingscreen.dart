@@ -1,3 +1,4 @@
+import 'package:finsight/login/signup/signUp.dart';
 import 'package:flutter/material.dart';
 
 class OnBoardingPage extends StatelessWidget {
@@ -68,6 +69,10 @@ class OnBoardingPage extends StatelessWidget {
                   height: 50,
                   child: TextButton(
                     onPressed: () {
+                      Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SignupPage()),
+                    );
                     },
                     style: TextButton.styleFrom(
                       backgroundColor: const Color(0xFF387E5A), // Approximate green/sage color
