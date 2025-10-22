@@ -134,18 +134,24 @@ class SigninPage extends StatelessWidget {
               const SizedBox(height: 15),
 
               // Google Button (Icon only)
-              Container(
-                width: 45,
-                height: 45,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.grey.shade400),
-                ),
-                child: Center(
-                  child: Image.network(
-                    'https://upload.wikimedia.org/wikipedia/commons/0/09/Google_icon.svg',
-                    width: 24,
-                    height: 24,
+              GestureDetector(
+                onTap: () {
+                  // TODO: Add your Google sign-in logic here
+                  print("Google Sign-In clicked!");
+                },
+                child: Container(
+                  width: 45,
+                  height: 45,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.grey.shade400),
+                  ),
+                  child: Center(
+                    child: Image.asset(
+                      'assets/images/logo/gmail.png',
+                      width: 24,
+                      height: 24,
+                    ),
                   ),
                 ),
               ),
@@ -163,9 +169,11 @@ class SigninPage extends StatelessWidget {
                   GestureDetector(
                     onTap: () {
                       Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const SignupPage()),
-                    );
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SignupPage(),
+                        ),
+                      );
                     },
                     child: const Text(
                       "Sign up",
@@ -195,8 +203,10 @@ class SigninPage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(fontSize: 14, color: Colors.black87)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14, color: Colors.black87),
+        ),
         const SizedBox(height: 6),
         TextField(
           obscureText: obscureText,
