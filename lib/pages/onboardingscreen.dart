@@ -1,4 +1,4 @@
-import 'package:finsight/login/signup/signUp.dart';
+import 'package:finsight/login/signup/singin.dart';
 import 'package:flutter/material.dart';
 
 class OnBoardingPage extends StatelessWidget {
@@ -71,7 +71,7 @@ class OnBoardingPage extends StatelessWidget {
                     onPressed: () {
                       Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const SignupPage()),
+                      MaterialPageRoute(builder: (context) => const SigninPage()),
                     );
                     },
                     style: TextButton.styleFrom(
