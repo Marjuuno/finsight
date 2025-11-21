@@ -1,4 +1,4 @@
-import 'package:finsight/pages/startup.dart';
+import 'package:finsight/startup/startup.dart';
 import 'package:flutter/material.dart';
 
 void main() {

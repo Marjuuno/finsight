@@ -1,4 +1,4 @@
-import 'package:finsight/pages/thirdstartup.dart';
+import 'package:finsight/startup/thirdstartup.dart';
 import 'package:flutter/material.dart';
 
 class OnboardingScreen extends StatelessWidget {

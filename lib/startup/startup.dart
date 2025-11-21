@@ -1,4 +1,4 @@
-import 'package:finsight/pages/secondstartup.dart';
+import 'package:finsight/startup/secondstartup.dart';
 import 'package:flutter/material.dart';
 
 class FinSightWelcomeScreen extends StatelessWidget {
