@@ -1,3 +1,4 @@
+import 'package:finsight/login/signup/singin.dart';
 import 'package:finsight/pages/homepage.dart';
 import 'package:finsight/pages/sharedbudget.dart';
 import 'package:finsight/pages/expenses.dart'; // Import the new ExpensesPage
@@ -69,20 +70,21 @@ class SettingsPage extends StatelessWidget {
               ),
 
               const SizedBox(height: 60), // Increased spacing before button
-
               // --- SIGN OUT BUTTON ---
               ElevatedButton(
-                onPressed: () => print('Sign Out Tapped'),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const SigninPage()),
+                  );
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _buttonColor,
                   foregroundColor: _primaryGreen,
                   padding: const EdgeInsets.symmetric(vertical: 15),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
-                    side: const BorderSide(
-                      color: _primaryGreen,
-                      width: 2,
-                    ),
+                    side: const BorderSide(color: _primaryGreen, width: 2),
                   ),
                   elevation: 0,
                 ),
@@ -111,14 +113,12 @@ class SettingsPage extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16.0), // Adjusted padding to match image
+        padding: const EdgeInsets.symmetric(
+          vertical: 16.0,
+        ), // Adjusted padding to match image
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 26,
-              color: _primaryGreen,
-            ),
+            Icon(icon, size: 26, color: _primaryGreen),
             const SizedBox(width: 15),
             Expanded(
               child: Text(
@@ -136,7 +136,7 @@ class SettingsPage extends StatelessWidget {
       ),
     );
   }
-  
+
   // Consistent Bottom Navigation Bar helper
   Widget _buildBottomNavigationBar(BuildContext context) {
     return Container(
@@ -155,15 +155,29 @@ class SettingsPage extends StatelessWidget {
             backgroundColor: _centerButtonColor,
             child: Icon(Icons.add, color: Colors.white, size: 34),
           ),
-          _navBarItem(context, Icons.credit_card_outlined, const ExpensesPage()),
+          _navBarItem(
+            context,
+            Icons.credit_card_outlined,
+            const ExpensesPage(),
+          ),
           // Highlight Settings icon since we are on the SettingsPage
-          _navBarItem(context, Icons.settings, const SettingsPage(), isCurrent: true),
+          _navBarItem(
+            context,
+            Icons.settings,
+            const SettingsPage(),
+            isCurrent: true,
+          ),
         ],
       ),
     );
   }
 
-  Widget _navBarItem(BuildContext context, IconData icon, Widget targetPage, {bool isCurrent = false}) {
+  Widget _navBarItem(
+    BuildContext context,
+    IconData icon,
+    Widget targetPage, {
+    bool isCurrent = false,
+  }) {
     return InkWell(
       onTap: () {
         // Use pushReplacement to switch main tabs without stacking history
@@ -174,7 +188,7 @@ class SettingsPage extends StatelessWidget {
       },
       child: Icon(
         icon,
-        color: isCurrent ? Colors.white : Colors.white70, 
+        color: isCurrent ? Colors.white : Colors.white70,
         size: 32,
       ),
     );

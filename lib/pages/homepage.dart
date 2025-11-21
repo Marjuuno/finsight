@@ -52,7 +52,7 @@ class HomePage extends StatelessWidget {
                 ),
               ),
 
-              // ----------------- INSIGHT CARD -----------------
+// ----------------- INSIGHT CARD (FIXED) -----------------
               Center(
                 child: Container(
                   width: 330,
@@ -60,28 +60,55 @@ class HomePage extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
+                    boxShadow: const [
                       BoxShadow(color: Colors.black12, blurRadius: 10),
                     ],
                   ),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Column( // Removed const here because of dynamic Text.rich
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(
-                        "INSIGHT",
-                        style: TextStyle(
-                          fontSize: 28,
-                          color: Color(0xFFE0A20C),
-                          fontWeight: FontWeight.bold,
+                      // First line: "INSIGHT into"
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: "INSIGHT ",
+                              style: TextStyle(
+                                fontSize: 28,
+                                color: Color(0xFFE0A20C), // Golden color
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            TextSpan(
+                              text: " into", // Space included for separation
+                              style: TextStyle(
+                                fontSize: 22, // Slightly smaller than INSIGHT
+                                color: Colors.black, // Default text color
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      Text("into", style: TextStyle(fontSize: 22)),
-                      Text(
-                        "every PESO",
-                        style: TextStyle(
-                          fontSize: 28,
-                          color: Color(0xFF0E8A41),
-                          fontWeight: FontWeight.bold,
+                      // Second line: "every PESO"
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: "every ",
+                              style: TextStyle(
+                                fontSize: 22,
+                                color: Colors.black,
+                              ),
+                            ),
+                            TextSpan(
+                              text: " PESO",
+                              style: TextStyle(
+                                fontSize: 28,
+                                color: Color(0xFF0E8A41), // Green color
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
