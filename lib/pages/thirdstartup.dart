@@ -1,8 +1,8 @@
-import 'package:finsight/pages/onboardingscreen.dart';
+import 'package:finsight/login/signup/singin.dart';
 import 'package:flutter/material.dart';
 
-class OnboardingScreen extends StatelessWidget {
-  const OnboardingScreen({super.key});
+class OnBoardingPage extends StatelessWidget {
+  const OnBoardingPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -22,11 +22,11 @@ class OnboardingScreen extends StatelessWidget {
               // TOP CONTENT: Title, Image, and Description
               Column(
                 children: <Widget>[
-                  // Title Text: "Stay on Top of your Spending"
+                  // Title Text: "Build Better Habits"
                   const Padding(
-                    padding: EdgeInsets.only(top: 60.0, bottom: 40.0),
+                    padding: EdgeInsets.only(top: 60.0, bottom: 85.0),
                     child: Text(
-                      'Stay on Top of your Spending',
+                      'Build Better Habits',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: 'Georgia', // Approximation of the serif font
@@ -41,14 +41,14 @@ class OnboardingScreen extends StatelessWidget {
                     height: screenWidth * 0.8,
                     color: Colors.transparent, // Transparent background
                     alignment: Alignment.center,
-                  child: Image.asset('assets/images/logo/wallet.png')
+                    child: Image.asset('assets/images/logo/piggybank.png')
                   ),
 
                   // Description Text
                   const Padding(
                     padding: EdgeInsets.only(top: 40.0),
                     child: Text(
-                      'Quickly log expenses and see\nwhere your money goes.',
+                      'Set goals and watch your\nsavings grow automatically.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 17.5,
@@ -69,10 +69,10 @@ class OnboardingScreen extends StatelessWidget {
                   height: 50,
                   child: TextButton(
                     onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const OnBoardingPage()),
-              );
+                      Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SigninPage()),
+                    );
                     },
                     style: TextButton.styleFrom(
                       backgroundColor: const Color(0xFF387E5A), // Approximate green/sage color
