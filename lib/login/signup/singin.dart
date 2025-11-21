@@ -1,5 +1,6 @@
 import 'package:finsight/login/signup/signUp.dart';
 import 'package:flutter/material.dart';
+import 'package:finsight/pages/homepage.dart';
 
 class SigninPage extends StatelessWidget {
   const SigninPage({super.key});
@@ -110,7 +111,14 @@ class SigninPage extends StatelessWidget {
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const HomePage(),
+                      ),
+                    );
+                  },
                   child: const Text(
                     'Login',
                     style: TextStyle(
