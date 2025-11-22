@@ -1,228 +1,345 @@
+import 'package:finsight/pages/addexpenses.dart';
+import 'package:finsight/pages/adduser.dart';
+import 'package:finsight/pages/addwallet.dart';
 import 'package:finsight/pages/expenses.dart';
 import 'package:finsight/pages/settings.dart';
 import 'package:finsight/pages/sharedbudget.dart';
 import 'package:flutter/material.dart';
 
-
 // Theme colors
-const Color _primaryGreen = Color(0xFF0D532E);
 const Color _accentGreen = Color(0xFF94A780);
-const Color _buttonColor = Color(0xFFC8E6C9);
-const Color _centerButtonColor = Colors.orange;
+const Color _centerButtonColor = Colors.orange; // Updated to be closer to image color
+const Color _popUpGreen = Color(0xFF558B6E); // Dark Green from the pop-up image
 
-class HomePage extends StatelessWidget {
+// Convert to StatefulWidget to manage the pop-up state
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  // State variable to control the visibility of the pop-up menu
+  bool _showAddMenu = false;
+
+  void _toggleAddMenu() {
+    setState(() {
+      _showAddMenu = !_showAddMenu;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ----------------- HEADER -----------------
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    // Wrap the entire screen in a GestureDetector to close the menu when tapping anywhere outside
+    return GestureDetector(
+      onTap: () {
+        if (_showAddMenu) {
+          _toggleAddMenu();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF5F5F5),
+        // Use Stack to layer the main content and the pop-up menu
+        body: Stack(
+          children: [
+            // 1. Main Content Area
+            SafeArea(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Greeting Chip
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+                    // ----------------- HEADER -----------------
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Greeting Chip
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF9CC9A0),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              "Hello, User!",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const Icon(Icons.notifications_none, size: 28),
+                        ],
                       ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF9CC9A0),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        "Hello, User!",
-                        style: TextStyle(
+                    ),
+
+                    // ----------------- INSIGHT CARD -----------------
+                    Center(
+                      child: Container(
+                        width: 330,
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
                           color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black12, blurRadius: 10),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // First line: "INSIGHT into"
+                            Text.rich(
+                              TextSpan(
+                                children: [
+                                  const TextSpan(
+                                    text: "INSIGHT ",
+                                    style: TextStyle(
+                                      fontSize: 28,
+                                      color: Color(0xFFE0A20C), // Golden color
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: " into",
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Second line: "every PESO"
+                            Text.rich(
+                              TextSpan(
+                                children: [
+                                  const TextSpan(
+                                    text: "every ",
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                  const TextSpan(
+                                    text: " PESO",
+                                    style: TextStyle(
+                                      fontSize: 28,
+                                      color: Color(0xFF0E8A41), // Green color
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
 
-                    const Icon(Icons.notifications_none, size: 28),
+                    const SizedBox(height: 25),
+
+                    // ----------------- STATUS -----------------
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Text(
+                        "Status",
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    Center(
+                      child: Container(
+                        width: 330,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFAFBCA8),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            StatusItem(
+                              icon: Icons.wallet,
+                              label: "Spending",
+                              amount: "-₱10,000",
+                              color: Colors.red,
+                            ),
+                            StatusItem(
+                              icon: Icons.attach_money,
+                              label: "Income",
+                              amount: "₱15,000",
+                              color: Colors.green,
+                            ),
+                            StatusItem(
+                              icon: Icons.savings,
+                              label: "Balance",
+                              amount: "₱5,000",
+                              color: Colors.black87,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 25),
+
+                    // ----------------- ACTIVITY -----------------
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Text(
+                        "Activity",
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    Center(
+                      child: Container(
+                        width: 330,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black12, blurRadius: 8),
+                          ],
+                        ),
+                        child: const Column(
+                          children: [
+                            ActivityItem(
+                              icon: Icons.home,
+                              title: "Home",
+                              date: "10/08/25",
+                              amount: "-₱1500",
+                            ),
+                            ActivityItem(
+                              icon: Icons.fastfood,
+                              title: "Food and Drinks",
+                              date: "10/08/25",
+                              amount: "-₱500",
+                            ),
+                            ActivityItem(
+                              icon: Icons.cleaning_services,
+                              title: "Personal Care",
+                              date: "10/08/25",
+                              amount: "-₱300",
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 80),
                   ],
                 ),
               ),
+            ),
 
-// ----------------- INSIGHT CARD (FIXED) -----------------
-              Center(
-                child: Container(
-                  width: 330,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: const [
-                      BoxShadow(color: Colors.black12, blurRadius: 10),
-                    ],
-                  ),
-                  child: Column( // Removed const here because of dynamic Text.rich
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // First line: "INSIGHT into"
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(
-                              text: "INSIGHT ",
-                              style: TextStyle(
-                                fontSize: 28,
-                                color: Color(0xFFE0A20C), // Golden color
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            TextSpan(
-                              text: " into", // Space included for separation
-                              style: TextStyle(
-                                fontSize: 22, // Slightly smaller than INSIGHT
-                                color: Colors.black, // Default text color
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Second line: "every PESO"
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(
-                              text: "every ",
-                              style: TextStyle(
-                                fontSize: 22,
-                                color: Colors.black,
-                              ),
-                            ),
-                            TextSpan(
-                              text: " PESO",
-                              style: TextStyle(
-                                fontSize: 28,
-                                color: Color(0xFF0E8A41), // Green color
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+            // 2. Pop-Up Menu Overlay (only visible when _showAddMenu is true)
+            if (_showAddMenu) _buildAddMenuOverlay(context),
+          ],
+        ),
+        bottomNavigationBar: _buildBottomNavigationBar(context),
+      ),
+    );
+  }
+
+  /// Pop-Up Menu Widget, positioned above the Navigation Bar
+  Widget _buildAddMenuOverlay(BuildContext context) {
+    // The Positioned widget places the menu in the Stack
+    return Positioned(
+      // 70 (NavBar height) + ~30 (margin/padding) = 100
+      bottom: 250, 
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Container(
+          width: 230, // Adjust width to fit the pop-up look
+          padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
+          decoration: BoxDecoration(
+            color: _popUpGreen,
+            borderRadius: BorderRadius.circular(25),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
               ),
-
-              const SizedBox(height: 25),
-
-              // ----------------- STATUS -----------------
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.0),
-                child: Text(
-                  "Status",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              Center(
-                child: Container(
-                  width: 330,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFAFBCA8),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: const [
-                      StatusItem(
-                        icon: Icons.wallet,
-                        label: "Spending",
-                        amount: "-₱10,000",
-                        color: Colors.red,
-                      ),
-                      StatusItem(
-                        icon: Icons.attach_money,
-                        label: "Income",
-                        amount: "₱15,000",
-                        color: Colors.green,
-                      ),
-                      StatusItem(
-                        icon: Icons.savings,
-                        label: "Balance",
-                        amount: "₱5,000",
-                        color: Colors.black87,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 25),
-
-              // ----------------- ACTIVITY -----------------
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.0),
-                child: Text(
-                  "Activity",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              Center(
-                child: Container(
-                  width: 330,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black12, blurRadius: 8),
-                    ],
-                  ),
-                  child: const Column(
-                    children: [
-                      ActivityItem(
-                        icon: Icons.home,
-                        title: "Home",
-                        date: "10/08/25",
-                        amount: "-₱1500",
-                      ),
-                      ActivityItem(
-                        icon: Icons.fastfood,
-                        title: "Food and Drinks",
-                        date: "10/08/25",
-                        amount: "-₱500",
-                      ),
-                      ActivityItem(
-                        icon: Icons.cleaning_services,
-                        title: "Personal Care",
-                        date: "10/08/25",
-                        amount: "-₱300",
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 80),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildPopUpButton('Add Wallet'),
+              _buildPopUpButton('Add User'),
+              _buildPopUpButton('Add Expenses'),
             ],
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(context),
     );
   }
-}
 
-  // Same bottom nav bar implementation used across all pages for consistency
+/// Helper for the white buttons inside the pop-up menu
+  Widget _buildPopUpButton(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5.0),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: () {
+            _toggleAddMenu(); // Close the menu regardless of the action
+
+            if (text == 'Add Wallet') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AddWalletPage()),
+              );
+            } else if (text == 'Add User') {
+              // New logic for Add User
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AddUserPage()),
+              );
+            } else if (text == 'Add Expenses') {
+              // New logic for Add Expenses
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AddExpensePage()),
+              );
+            } else {
+              // Handle other actions like 'Add User' or 'Add Expenses'
+              print('$text clicked!');
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black87,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            elevation: 1,
+          ),
+          child: Text(
+            text,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Bottom Navigation Bar implementation (mostly reused from your code)
   Widget _buildBottomNavigationBar(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
@@ -235,38 +352,46 @@ class HomePage extends StatelessWidget {
         children: [
           _navBarItem(context, Icons.home, const HomePage(), isCurrent: true),
           _navBarItem(context, Icons.groups_2, const SharedBudget()),
-          const CircleAvatar(
-            radius: 28,
-            backgroundColor: _centerButtonColor,
-            child: Icon(Icons.add, color: Colors.white, size: 34),
+          // Interactive Center Button
+          InkWell(
+            onTap: _toggleAddMenu, // Toggles the pop-up menu
+            child: const CircleAvatar(
+              radius: 28,
+              backgroundColor: _centerButtonColor,
+              child: Icon(Icons.add, color: Colors.white, size: 34),
+            ),
           ),
-          // Highlight Expenses icon since we are on the ExpensesPage
-          _navBarItem(context, Icons.credit_card_outlined, const ExpensesPage()), 
+          _navBarItem(context, Icons.credit_card_outlined, const ExpensesPage()),
           _navBarItem(context, Icons.settings, const SettingsPage()),
         ],
       ),
     );
   }
 
+  // Nav Bar Item helper function
   Widget _navBarItem(BuildContext context, IconData icon, Widget targetPage, {bool isCurrent = false}) {
     return InkWell(
       onTap: () {
-        // Use pushReplacement to prevent building up a huge navigation stack for main tabs
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => targetPage),
-        );
+        // Prevent navigating if the current page is already selected or if we're tapping the 'Add' button placeholder
+        if (!isCurrent) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => targetPage),
+          );
+        }
       },
       child: Icon(
         icon,
-        color: isCurrent ? Colors.white : Colors.white70, 
+        color: isCurrent ? Colors.white : Colors.white70,
         size: 32,
       ),
     );
   }
+}
 
-// ----------------- STATUS WIDGET -----------------
+// ----------------- STATUS WIDGET (Reused) -----------------
 class StatusItem extends StatelessWidget {
+// ... (StatusItem code remains the same)
   final IconData icon;
   final String label;
   final String amount;
@@ -296,8 +421,9 @@ class StatusItem extends StatelessWidget {
   }
 }
 
-// ----------------- ACTIVITY ITEM -----------------
+// ----------------- ACTIVITY ITEM (Reused) -----------------
 class ActivityItem extends StatelessWidget {
+// ... (ActivityItem code remains the same)
   final IconData icon;
   final String title;
   final String date;
