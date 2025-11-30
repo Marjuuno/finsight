@@ -8,7 +8,6 @@ import 'expenses.dart';
 import 'settings.dart';
 import 'sharedbudget.dart';
 
-// Theme colors
 const Color _accentGreen = Color(0xFF94A780);
 const Color _centerButtonColor = Colors.orange;
 const Color _popUpGreen = Color(0xFF558B6E);
@@ -22,9 +21,11 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   bool _showAddMenu = false;
-  double totalIncome = 0.0;     // Total from wallets
-  double totalSpending = 0.0;   // Total from expenses
-  double totalBalance = 0.0;    // Income - Spending
+  double totalIncome = 0.0;
+  double totalSpending = 0.0;
+  double totalBalance = 0.0;
+
+  List<Map<String, dynamic>> expenses = [];
 
   @override
   void initState() {
@@ -38,43 +39,97 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  /// Fetch wallets and expenses
   Future<void> _fetchData() async {
     try {
       final User? user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      // Total Income (sum of wallets)
+      // ---------- Fetch wallets ----------
       QuerySnapshot walletsSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('wallets')
           .get();
 
-      double incomeSum = 0.0;
+      double sumIncome = 0.0;
       for (var doc in walletsSnapshot.docs) {
-        incomeSum += (doc['balance'] ?? 0).toDouble();
+        final data = doc.data() as Map<String, dynamic>;
+        sumIncome += (data['balance'] ?? 0).toDouble();
       }
 
-      // Total Spending (sum of expenses)
+      // ---------- Fetch expenses ----------
       QuerySnapshot expensesSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('expenses')
+          .orderBy('date', descending: true)
           .get();
 
-      double spendingSum = 0.0;
+      double sumSpending = 0.0;
+      List<Map<String, dynamic>> fetchedExpenses = [];
+
       for (var doc in expensesSnapshot.docs) {
-        spendingSum += (doc['amount'] ?? 0).toDouble();
+        final data = doc.data() as Map<String, dynamic>;
+        double amount = (data['amount'] ?? 0).toDouble();
+
+        // Only consider as expense (we can filter by type if your Firestore has it)
+        sumSpending += amount;
+
+        // Add to activity
+        fetchedExpenses.add({
+          'category': data['category'] ?? 'Unknown',
+          'amount': amount,
+          'date': data['date'] != null
+              ? (data['date'] is Timestamp
+                  ? (data['date'] as Timestamp).toDate()
+                  : DateTime.tryParse(data['date'].toString()) ?? DateTime.now())
+              : DateTime.now(),
+        });
       }
 
       setState(() {
-        totalIncome = incomeSum;
-        totalSpending = spendingSum;
+        totalIncome = sumIncome;
+        totalSpending = sumSpending;
         totalBalance = totalIncome - totalSpending;
+        expenses = fetchedExpenses.take(4).toList(); // Show only 4 recent
       });
     } catch (e) {
       print('Error fetching data: $e');
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    return "${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}/${date.year % 100}";
+  }
+
+  IconData _getIconForCategory(String category) {
+    switch (category.toLowerCase()) {
+      case 'health':
+        return Icons.favorite_border;
+      case 'transportation':
+        return Icons.directions_car_filled_outlined;
+      case 'education':
+        return Icons.school_outlined;
+      case 'subscription':
+        return Icons.calendar_month_outlined;
+      case 'groceries':
+        return Icons.shopping_basket_outlined;
+      case 'food':
+        return Icons.fastfood_outlined;
+      case 'daily':
+        return Icons.local_mall_outlined;
+      case 'entertainment':
+        return Icons.movie_outlined;
+      case 'house':
+        return Icons.home_outlined;
+      case 'clothing':
+        return Icons.checkroom_outlined;
+      case 'self-care':
+        return Icons.spa_outlined;
+      case 'bills':
+        return Icons.receipt_long_outlined;
+      default:
+        return Icons.receipt_long_outlined;
     }
   }
 
@@ -93,7 +148,7 @@ class _HomePageState extends State<HomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ----------------- HEADER -----------------
+                    // -------- Header --------
                     Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: Row(
@@ -107,10 +162,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                             child: const Text(
                               "Hello, User!",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                             ),
                           ),
                           const Icon(Icons.notifications_none, size: 28),
@@ -118,7 +170,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
 
-                    // ----------------- INSIGHT CARD -----------------
+                    // -------- Insight --------
                     Center(
                       child: Container(
                         width: 330,
@@ -135,20 +187,14 @@ class _HomePageState extends State<HomePage> {
                               TextSpan(
                                 children: [
                                   const TextSpan(
-                                    text: "INSIGHT ",
-                                    style: TextStyle(
-                                      fontSize: 28,
-                                      color: Color(0xFFE0A20C),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                      text: "INSIGHT ",
+                                      style: TextStyle(
+                                          fontSize: 28,
+                                          color: Color(0xFFE0A20C),
+                                          fontWeight: FontWeight.bold)),
                                   const TextSpan(
-                                    text: " into",
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      color: Colors.black,
-                                    ),
-                                  ),
+                                      text: " into",
+                                      style: TextStyle(fontSize: 22, color: Colors.black)),
                                 ],
                               ),
                             ),
@@ -156,17 +202,13 @@ class _HomePageState extends State<HomePage> {
                               TextSpan(
                                 children: [
                                   const TextSpan(
-                                    text: "every ",
-                                    style: TextStyle(fontSize: 22, color: Colors.black),
-                                  ),
+                                      text: "every ", style: TextStyle(fontSize: 22, color: Colors.black)),
                                   TextSpan(
-                                    text: "PESO",
-                                    style: TextStyle(
-                                      fontSize: 28,
-                                      color: const Color(0xFF0E8A41),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                      text: "PESO",
+                                      style: TextStyle(
+                                          fontSize: 28,
+                                          color: const Color(0xFF0E8A41),
+                                          fontWeight: FontWeight.bold)),
                                 ],
                               ),
                             ),
@@ -177,16 +219,12 @@ class _HomePageState extends State<HomePage> {
 
                     const SizedBox(height: 25),
 
-                    // ----------------- STATUS -----------------
+                    // -------- Status --------
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Text(
-                        "Status",
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
+                      child: Text("Status", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(height: 10),
-
                     Center(
                       child: Container(
                         width: 330,
@@ -223,16 +261,12 @@ class _HomePageState extends State<HomePage> {
 
                     const SizedBox(height: 25),
 
-                    // ----------------- ACTIVITY -----------------
+                    // -------- Activity --------
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Text(
-                        "Activity",
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
+                      child: Text("Activity", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(height: 10),
-
                     Center(
                       child: Container(
                         width: 330,
@@ -242,28 +276,25 @@ class _HomePageState extends State<HomePage> {
                           borderRadius: BorderRadius.circular(18),
                           boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
                         ),
-                        child: const Column(
-                          children: [
-                            ActivityItem(
-                              icon: Icons.home,
-                              title: "Home",
-                              date: "10/08/25",
-                              amount: "-₱1500",
-                            ),
-                            ActivityItem(
-                              icon: Icons.fastfood,
-                              title: "Food and Drinks",
-                              date: "10/08/25",
-                              amount: "-₱500",
-                            ),
-                            ActivityItem(
-                              icon: Icons.cleaning_services,
-                              title: "Personal Care",
-                              date: "10/08/25",
-                              amount: "-₱300",
-                            ),
-                          ],
-                        ),
+                        child: expenses.isEmpty
+                            ? const Padding(
+                                padding: EdgeInsets.all(20.0),
+                                child: Text(
+                                  "No expenses recorded.",
+                                  style: TextStyle(color: Colors.grey),
+                                  textAlign: TextAlign.center,
+                                ),
+                              )
+                            : Column(
+                                children: expenses.map((expense) {
+                                  return ActivityItem(
+                                    icon: _getIconForCategory(expense['category']),
+                                    title: expense['category'],
+                                    date: _formatDate(expense['date']),
+                                    amount: "-₱${expense['amount'].toStringAsFixed(2)}",
+                                  );
+                                }).toList(),
+                              ),
                       ),
                     ),
                     const SizedBox(height: 80),
@@ -271,7 +302,6 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-
             if (_showAddMenu) _buildAddMenuOverlay(context),
           ],
         ),
@@ -280,7 +310,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Pop-Up Menu
+  // ---------------- PopUp ----------------
   Widget _buildAddMenuOverlay(BuildContext context) {
     return Positioned(
       bottom: 250,
@@ -293,13 +323,7 @@ class _HomePageState extends State<HomePage> {
           decoration: BoxDecoration(
             color: _popUpGreen,
             borderRadius: BorderRadius.circular(25),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 15,
-                offset: const Offset(0, 5),
-              ),
-            ],
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5))],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -322,43 +346,28 @@ class _HomePageState extends State<HomePage> {
         child: ElevatedButton(
           onPressed: () {
             _toggleAddMenu();
-
             if (text == 'Add Wallet') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AddWalletPage()),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const AddWalletPage()));
             } else if (text == 'Add User') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AddUserPage()),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const AddUserPage()));
             } else if (text == 'Add Expenses') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AddExpensePage()),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const AddExpensePage()));
             }
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
             foregroundColor: Colors.black87,
             padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             elevation: 1,
           ),
-          child: Text(
-            text,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-          ),
+          child: Text(text, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
         ),
       ),
     );
   }
 
-  /// Bottom NavBar
+  // ---------------- Bottom Nav ----------------
   Widget _buildBottomNavigationBar(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
@@ -386,40 +395,26 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _navBarItem(BuildContext context, IconData icon, Widget targetPage,
-      {bool isCurrent = false}) {
+  Widget _navBarItem(BuildContext context, IconData icon, Widget targetPage, {bool isCurrent = false}) {
     return InkWell(
       onTap: () {
         if (!isCurrent) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => targetPage),
-          );
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => targetPage));
         }
       },
-      child: Icon(
-        icon,
-        color: isCurrent ? Colors.white : Colors.white70,
-        size: 32,
-      ),
+      child: Icon(icon, color: isCurrent ? Colors.white : Colors.white70, size: 32),
     );
   }
 }
 
-// ----------------- STATUS ITEM -----------------
+// ---------------- Status Item ----------------
 class StatusItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final String amount;
   final Color color;
 
-  const StatusItem({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.amount,
-    required this.color,
-  });
+  const StatusItem({super.key, required this.icon, required this.label, required this.amount, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -427,30 +422,21 @@ class StatusItem extends StatelessWidget {
       children: [
         Icon(icon, size: 32, color: Colors.white),
         const SizedBox(height: 6),
-        Text(
-          amount,
-          style: TextStyle(color: color, fontWeight: FontWeight.bold),
-        ),
+        Text(amount, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
         Text(label, style: const TextStyle(color: Colors.white)),
       ],
     );
   }
 }
 
-// ----------------- ACTIVITY ITEM -----------------
+// ---------------- Activity Item ----------------
 class ActivityItem extends StatelessWidget {
   final IconData icon;
   final String title;
   final String date;
   final String amount;
 
-  const ActivityItem({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.date,
-    required this.amount,
-  });
+  const ActivityItem({super.key, required this.icon, required this.title, required this.date, required this.amount});
 
   @override
   Widget build(BuildContext context) {
@@ -461,33 +447,18 @@ class ActivityItem extends StatelessWidget {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                backgroundColor: Colors.grey.shade200,
-                child: Icon(icon, color: Colors.black87),
-              ),
+              CircleAvatar(backgroundColor: Colors.grey.shade200, child: Icon(icon, color: Colors.black87)),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   Text(date, style: const TextStyle(color: Colors.grey)),
                 ],
               ),
             ],
           ),
-          Text(
-            amount,
-            style: const TextStyle(
-              color: Colors.red,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text(amount, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
         ],
       ),
     );
