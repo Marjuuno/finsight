@@ -286,7 +286,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
         future: _loadProfileData(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: _darkGreen));
+            return const Center(child: CircularProgressIndicator(color: Color(0xFF387E5A)));
           }
           if (snapshot.hasError || _currentUser == null) {
             return const Center(
@@ -333,7 +333,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                             },
                             child: CircleAvatar(
                               radius: 20,
-                              backgroundColor: _darkGreen,
+                              backgroundColor: Color(0xFF387E5A),
                               child: Icon(
                                 Icons.camera_alt,
                                 color: Colors.white,
