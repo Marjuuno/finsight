@@ -172,7 +172,7 @@ class _SettingsPageState extends State<SettingsPage> {
           width: 230,
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
           decoration: BoxDecoration(
-            color: _popUpGreen,
+            color: Color(0xFF387E5A),
             borderRadius: BorderRadius.circular(25),
             boxShadow: [
               BoxShadow(
@@ -242,7 +242,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _buildBottomNavigationBar() {
     return Container(
       decoration: const BoxDecoration(
-        color: _accentGreen,
+        color: Color(0xFF387E5A),
         borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
       ),
       padding: const EdgeInsets.symmetric(vertical: 12),

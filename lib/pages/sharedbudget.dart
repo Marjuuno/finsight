@@ -125,7 +125,7 @@ class _SharedBudgetState extends State<SharedBudget> {
           width: 230, // Adjust width to fit the pop-up look
           padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
           decoration: BoxDecoration(
-            color: _popUpGreen,
+            color: Color(0xFF387E5A),
             borderRadius: BorderRadius.circular(25),
             boxShadow: [
               BoxShadow(
@@ -201,7 +201,7 @@ class _SharedBudgetState extends State<SharedBudget> {
   Widget _buildBottomNavigationBar(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: _accentGreen,
+        color: Color(0xFF387E5A),
         borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
       ),
       padding: const EdgeInsets.symmetric(vertical: 12),
