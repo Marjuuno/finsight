@@ -7,6 +7,7 @@ import 'package:finsight/pages/expenses.dart';
 import 'package:finsight/pages/addexpenses.dart';
 import 'package:finsight/pages/adduser.dart';
 import 'package:finsight/pages/addwallet.dart';
+import 'package:finsight/pages/settings/profile.dart'; 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -37,25 +38,30 @@ class _SettingsPageState extends State<SettingsPage> {
     try {
       await FirebaseAuth.instance.signOut();
 
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const SigninPage()),
-        (Route<dynamic> route) => false,
-      );
+      // Navigate to sign-in page and remove all previous routes
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const SigninPage()),
+          (Route<dynamic> route) => false,
+        );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Signed out successfully."),
-          backgroundColor: Colors.green,
-        ),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Signed out successfully."),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Failed to sign out: $e"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Failed to sign out: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -78,6 +84,13 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
     Navigator.push(context, MaterialPageRoute(builder: (context) => target));
+  }
+  
+  void _navigateToProfilePage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ProfileSettingsPage()),
+    );
   }
 
   @override
@@ -110,12 +123,16 @@ class _SettingsPageState extends State<SettingsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _buildSettingsListTile(Icons.person_outline, 'Profile', () => print('Profile')),
+                    // Profile link navigates to ProfileSettingsPage
+                    _buildSettingsListTile(Icons.person_outline, 'Profile', _navigateToProfilePage),
                     _buildSettingsListTile(Icons.notifications_none, 'Notifications', () => print('Notifications')),
                     _buildSettingsListTile(Icons.work_outline, 'Linked Wallets', () => print('Linked Wallets')),
                     _buildSettingsListTile(Icons.people_outline, 'Roles', () => print('Roles')),
                     _buildSettingsListTile(Icons.settings, 'App Preferences', () => print('App Preferences')),
+                    
                     const SizedBox(height: 60),
+                    
+                    // Sign Out Button
                     ElevatedButton(
                       onPressed: _signOut,
                       style: ElevatedButton.styleFrom(

@@ -1,9 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // Add this package to your pubspec.yaml for date formatting
+
+// Assuming these pages exist and were imported in the context of the previous request
 import 'package:finsight/pages/settings.dart';
 import 'package:finsight/pages/sharedbudget.dart';
 import 'package:finsight/pages/homepage.dart';
-import 'package:flutter/material.dart';
-
-// Assuming these pages exist and were imported in the context of the previous request
 import 'package:finsight/pages/addexpenses.dart';
 import 'package:finsight/pages/adduser.dart';
 import 'package:finsight/pages/addwallet.dart';
@@ -14,8 +17,8 @@ const Color _accentGreen = Color(0xFF94A780); // Bottom Nav Bar background
 const Color _centerButtonColor = Colors.orange;
 const Color _expensesBackgroundColor = Color(0xFFE8F5E9);
 const Color _popUpGreen = Color(0xFF558B6E); // Dark Green from the pop-up image
+const Color _expenseHighlight = Colors.red;
 
-// Convert to StatefulWidget to manage the pop-up state
 class ExpensesPage extends StatefulWidget {
   const ExpensesPage({super.key});
 
@@ -24,8 +27,25 @@ class ExpensesPage extends StatefulWidget {
 }
 
 class _ExpensesPageState extends State<ExpensesPage> {
-  // State variable to control the visibility of the pop-up menu
   bool _showAddMenu = false;
+  
+  // ------------------- FIREBASE DATA STATE -------------------
+  List<Map<String, dynamic>> _allExpenses = []; // Store all fetched expenses
+  List<Map<String, dynamic>> _filteredExpenses = []; // Store expenses for selected date
+  bool isLoading = true;
+  String? errorMessage;
+  double _totalDayExpenses = 0.0;
+  
+  // New state for Calendar Functionality
+  DateTime _selectedDate = DateTime.now().copyWith(hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0);
+  Map<String, double> _dailyExpensesMap = {}; // Key: 'YYYY-MM-DD', Value: total expense
+  // -------------------------------------------------------------
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchExpenses(); 
+  }
 
   void _toggleAddMenu() {
     setState(() {
@@ -33,9 +53,130 @@ class _ExpensesPageState extends State<ExpensesPage> {
     });
   }
 
+  // --- NEW: Function to handle date selection from the calendar ---
+  void _selectDate(DateTime newDate) {
+    setState(() {
+      _selectedDate = newDate;
+    });
+    // Re-filter and update totals based on the new date
+    _filterExpensesByDate();
+  }
+
+  // --- NEW: Function to filter expenses based on the selected date ---
+  void _filterExpensesByDate() {
+    final String selectedDateString = DateFormat('yyyy-MM-dd').format(_selectedDate);
+
+    _filteredExpenses = _allExpenses.where((expense) {
+      final expenseDate = expense['date'] as DateTime;
+      final expenseDateString = DateFormat('yyyy-MM-dd').format(expenseDate);
+      return expenseDateString == selectedDateString;
+    }).toList();
+
+    // Calculate total for the selected day
+    _totalDayExpenses = _filteredExpenses.fold(0.0, (sum, item) => sum + (item['amount'] as double));
+
+    setState(() {}); // Update the UI with filtered list and total
+  }
+
+  // --- UPDATED: Fetch all expenses and calculate daily totals ---
+  Future<void> _fetchExpenses() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+      _dailyExpensesMap = {}; // Reset map
+      _allExpenses = []; // Reset all expenses list
+    });
+
+    try {
+      final User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() {
+          isLoading = false;
+          errorMessage = 'User not signed in.';
+        });
+        return;
+      }
+
+      QuerySnapshot expensesSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('expenses') 
+          .orderBy('date', descending: true) 
+          .get();
+
+      List<Map<String, dynamic>> fetchedExpenses = [];
+      Map<String, double> calculatedDailyExpenses = {};
+
+      for (var doc in expensesSnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        
+        // Safely extract amount and date
+        double amount = 0.0;
+        if (data.containsKey('amount')) {
+          if (data['amount'] is num) {
+            amount = data['amount'].toDouble();
+          } else if (data['amount'] is String) {
+            amount = double.tryParse(data['amount']) ?? 0.0;
+          }
+        }
+        
+        DateTime date = data['date'] != null
+            ? (data['date'] is Timestamp
+                ? (data['date'] as Timestamp).toDate()
+                : DateTime.tryParse(data['date'].toString()) ?? DateTime.now())
+            : DateTime.now();
+
+        // Accumulate daily total for the map
+        final dateKey = DateFormat('yyyy-MM-dd').format(date);
+        calculatedDailyExpenses[dateKey] = (calculatedDailyExpenses[dateKey] ?? 0.0) + amount;
+        
+        fetchedExpenses.add({
+          'category': data['category'] ?? 'Unknown',
+          'amount': amount,
+          'user': data['userTag'] ?? 'Me', 
+          'date': date.copyWith(hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0), // Normalize date
+        });
+      }
+
+      setState(() {
+        _allExpenses = fetchedExpenses;
+        _dailyExpensesMap = calculatedDailyExpenses;
+        isLoading = false;
+      });
+
+      // Filter and calculate total for the *currently selected* date after fetching all data
+      _filterExpensesByDate(); 
+
+    } catch (e) {
+      print('Error fetching expenses: $e');
+      setState(() {
+        isLoading = false;
+        errorMessage = 'Failed to load expenses.';
+      });
+    }
+  }
+
+  // Utility to map category names to icons 
+  IconData _getIconForCategory(String category) {
+    switch (category.toLowerCase()) {
+      case 'health': return Icons.favorite_border;
+      case 'transportation': return Icons.directions_car_filled_outlined;
+      case 'education': return Icons.school_outlined;
+      case 'subscription': return Icons.calendar_month_outlined;
+      case 'groceries': return Icons.shopping_basket_outlined;
+      case 'food': return Icons.fastfood_outlined;
+      case 'daily': return Icons.local_mall_outlined;
+      case 'entertainment': return Icons.movie_outlined;
+      case 'house': return Icons.home_outlined;
+      case 'clothing': return Icons.checkroom_outlined;
+      case 'self-care': return Icons.spa_outlined;
+      case 'bills': return Icons.receipt_long_outlined;
+      default: return Icons.receipt_long_outlined;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Wrap the entire screen in a GestureDetector to close the menu when tapping anywhere outside
     return GestureDetector(
       onTap: () {
         if (_showAddMenu) {
@@ -44,73 +185,60 @@ class _ExpensesPageState extends State<ExpensesPage> {
       },
       child: Scaffold(
         backgroundColor: Colors.white,
-        // Use Stack to layer the main content and the pop-up menu
         body: Stack(
           children: [
             // 1. Main Content Area
             SafeArea(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    // ----------------- CALENDAR WIDGET -----------------
-                    const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: CalendarWidget(),
+              child: Column(
+                children: [
+                  // ----------------- CALENDAR WIDGET -----------------
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: CalendarWidget(
+                      selectedDate: _selectedDate,
+                      dailyTotals: _dailyExpensesMap,
+                      onDateSelected: _selectDate, // Pass the callback
+                      onMonthYearChanged: _fetchExpenses, // Fetch new data if month/year changes
                     ),
+                  ),
 
-                    // ----------------- EXPENSES LIST HEADER -----------------
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                      color: _expensesBackgroundColor,
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Thurs, 11/20",
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: _primaryGreen),
-                          ),
-                          Text(
-                            "Expenses: ₱5,337",
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.red),
-                          ),
-                        ],
-                      ),
+                  // ----------------- EXPENSES LIST HEADER -----------------
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    color: _expensesBackgroundColor,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          DateFormat('EEE, MM/dd').format(_selectedDate), 
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _primaryGreen),
+                        ),
+                        Text(
+                          "Expenses: ₱${_totalDayExpenses.toStringAsFixed(2)}", 
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red),
+                        ),
+                      ],
                     ),
-                    
-                    // ----------------- EXPENSES LIST ITEMS -----------------
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                      child: Column(
-                        children: [
-                          ExpenseItem(
-                            icon: Icons.grid_view, title: "Entertainment", user: "Me", amount: "-₱500",
-                          ),
-                          ExpenseItem(
-                            icon: Icons.fastfood_outlined, title: "Food", user: "Sister", amount: "-₱350",
-                          ),
-                          ExpenseItem(
-                            icon: Icons.local_grocery_store_outlined, title: "Groceries", user: "Mother", amount: "-₱1,987",
-                          ),
-                          ExpenseItem(
-                            icon: Icons.school_outlined, title: "Education", user: "Me", amount: "-₱1,500",
-                          ),
-                          ExpenseItem(
-                            icon: Icons.favorite_border, title: "Health", user: "Father", amount: "-₱1,000",
-                          ),
-                        ],
-                      ),
+                  ),
+                  
+                  // ----------------- DYNAMIC EXPENSES LIST ITEMS -----------------
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: _fetchExpenses, // Allow refreshing the list
+                      color: _primaryGreen,
+                      child: _buildExpenseList(), // Uses filtered data
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
             
-            // 2. Pop-Up Menu Overlay (only visible when _showAddMenu is true)
+            // 2. Pop-Up Menu Overlay
             if (_showAddMenu) _buildAddMenuOverlay(context),
           ],
         ),
@@ -121,9 +249,57 @@ class _ExpensesPageState extends State<ExpensesPage> {
     );
   }
 
-  // --- Start of Reused Pop-Up Logic ---
+  Widget _buildExpenseList() {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-  /// Pop-Up Menu Widget, positioned above the Navigation Bar
+    if (errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Text(
+            'Error: $errorMessage',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.red),
+          ),
+        ),
+      );
+    }
+
+    if (_filteredExpenses.isEmpty) {
+      // Use a ListView to ensure RefreshIndicator works even when empty
+      return ListView(
+        children: [
+          const SizedBox(height: 50),
+          Center(
+            child: Text(
+              "No expenses recorded for ${DateFormat('MM/dd').format(_selectedDate)}. Tap to select a different date.",
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey, fontSize: 16),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      itemCount: _filteredExpenses.length,
+      itemBuilder: (context, index) {
+        final expense = _filteredExpenses[index];
+        return ExpenseItem(
+          icon: _getIconForCategory(expense['category']), 
+          title: expense['category'],
+          user: expense['user'],
+          amount: "-₱${expense['amount'].toStringAsFixed(2)}",
+        );
+      },
+    );
+  }
+
+  // --- Reused Pop-Up and Navigation Logic ---
+
   Widget _buildAddMenuOverlay(BuildContext context) {
     return Positioned(
       bottom: 280, 
@@ -157,7 +333,6 @@ class _ExpensesPageState extends State<ExpensesPage> {
     );
   }
 
-  /// Helper for the white buttons inside the pop-up menu
   Widget _buildPopUpButton(String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5.0),
@@ -165,25 +340,23 @@ class _ExpensesPageState extends State<ExpensesPage> {
         width: double.infinity,
         child: ElevatedButton(
           onPressed: () {
-            _toggleAddMenu(); // Close the menu regardless of the action
+            _toggleAddMenu(); 
 
-            // Handle navigation based on the button text
+            Widget targetPage;
             if (text == 'Add Wallet') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AddWalletPage()),
-              );
+              targetPage = const AddWalletPage();
             } else if (text == 'Add User') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AddUserPage()),
-              );
+              targetPage = const AddUserPage();
             } else if (text == 'Add Expenses') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AddExpensePage()),
-              );
+              targetPage = const AddExpensePage();
+            } else {
+              return;
             }
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => targetPage),
+            ).then((_) => _fetchExpenses()); // Refresh data when returning from add page
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
@@ -203,9 +376,6 @@ class _ExpensesPageState extends State<ExpensesPage> {
     );
   }
 
-  // --- End of Reused Pop-Up Logic ---
-
-  // Same bottom nav bar implementation used across all pages for consistency
   Widget _buildBottomNavigationBar(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
@@ -218,16 +388,14 @@ class _ExpensesPageState extends State<ExpensesPage> {
         children: [
           _navBarItem(context, Icons.home, const HomePage()),
           _navBarItem(context, Icons.groups_2, const SharedBudget()),
-          // Interactive Center Button
           InkWell(
-            onTap: _toggleAddMenu, // Toggles the pop-up menu
+            onTap: _toggleAddMenu, 
             child: const CircleAvatar(
               radius: 28,
               backgroundColor: _centerButtonColor,
               child: Icon(Icons.add, color: Colors.white, size: 34),
             ),
           ),
-          // Highlight Expenses icon since we are on the ExpensesPage
           _navBarItem(context, Icons.credit_card_outlined, const ExpensesPage(), isCurrent: true), 
           _navBarItem(context, Icons.settings, const SettingsPage()),
         ],
@@ -238,8 +406,8 @@ class _ExpensesPageState extends State<ExpensesPage> {
   Widget _navBarItem(BuildContext context, IconData icon, Widget targetPage, {bool isCurrent = false}) {
     return InkWell(
       onTap: () {
-        // Use pushReplacement to prevent building up a huge navigation stack for main tabs
         if (!isCurrent) {
+          // Use pushReplacement for navigation between main tabs
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => targetPage),
@@ -255,10 +423,130 @@ class _ExpensesPageState extends State<ExpensesPage> {
   }
 }
 
-// ----------------- CALENDAR WIDGET (Remains the same) -----------------
-class CalendarWidget extends StatelessWidget {
-// ... (CalendarWidget code remains the same)
-  const CalendarWidget({super.key});
+// ----------------- CALENDAR WIDGET (UPDATED FOR INTERACTIVITY) -----------------
+class CalendarWidget extends StatefulWidget {
+  final DateTime selectedDate;
+  final Map<String, double> dailyTotals;
+  final Function(DateTime) onDateSelected;
+  final VoidCallback onMonthYearChanged;
+
+  const CalendarWidget({
+    super.key,
+    required this.selectedDate,
+    required this.dailyTotals,
+    required this.onDateSelected,
+    required this.onMonthYearChanged,
+  });
+
+  @override
+  State<CalendarWidget> createState() => _CalendarWidgetState();
+}
+
+class _CalendarWidgetState extends State<CalendarWidget> {
+  late DateTime _displayedMonth;
+  late List<DateTime> _monthDays;
+  late String _mostExpensiveDayKey;
+  late String _leastExpensiveDayKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayedMonth = widget.selectedDate.copyWith(day: 1);
+    _calculateMonthDays();
+    _calculateExpensiveDays();
+  }
+
+  @override
+  void didUpdateWidget(covariant CalendarWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Recalculate days if selected month changes
+    if (widget.selectedDate.month != oldWidget.selectedDate.month || 
+        widget.selectedDate.year != oldWidget.selectedDate.year) {
+      _displayedMonth = widget.selectedDate.copyWith(day: 1);
+      _calculateMonthDays();
+    }
+    // Always recalculate expensive days when dailyTotals update
+    if (widget.dailyTotals != oldWidget.dailyTotals) {
+      _calculateExpensiveDays();
+    }
+  }
+
+  void _calculateExpensiveDays() {
+    if (widget.dailyTotals.isEmpty) {
+      _mostExpensiveDayKey = '';
+      _leastExpensiveDayKey = '';
+      return;
+    }
+
+    double maxExpense = -1.0;
+    double minExpense = double.maxFinite;
+    String maxKey = '';
+    String minKey = '';
+
+    widget.dailyTotals.forEach((key, value) {
+      // Only consider days in the currently displayed month
+      if (key.startsWith(DateFormat('yyyy-MM').format(_displayedMonth))) {
+        if (value > maxExpense) {
+          maxExpense = value;
+          maxKey = key;
+        }
+        if (value < minExpense) {
+          minExpense = value;
+          minKey = key;
+        }
+      }
+    });
+
+    _mostExpensiveDayKey = maxExpense > 0 ? maxKey : '';
+    _leastExpensiveDayKey = minExpense != double.maxFinite ? minKey : '';
+  }
+
+  // Utility to generate a list of days for the currently displayed month
+  void _calculateMonthDays() {
+    final firstDayOfMonth = _displayedMonth;
+    final lastDayOfMonth = DateTime(firstDayOfMonth.year, firstDayOfMonth.month + 1, 0);
+
+    // Get the weekday of the first day (Monday=1, Sunday=7). Calendar starts on Sunday (index 0).
+    int firstWeekday = firstDayOfMonth.weekday % 7; 
+
+    List<DateTime> days = [];
+
+    // Add padding days from the previous month
+    for (int i = 0; i < firstWeekday; i++) {
+      days.add(firstDayOfMonth.subtract(Duration(days: firstWeekday - i)));
+    }
+
+    // Add actual days of the month
+    for (int i = 0; i < lastDayOfMonth.day; i++) {
+      days.add(firstDayOfMonth.add(Duration(days: i)));
+    }
+
+    // Add padding days from the next month
+    int remaining = 7 - (days.length % 7);
+    if (remaining < 7) {
+      for (int i = 0; i < remaining; i++) {
+        days.add(lastDayOfMonth.add(Duration(days: i + 1)));
+      }
+    }
+    _monthDays = days;
+  }
+  
+  // Handlers for month/year navigation
+  void _goToPreviousMonth() {
+    setState(() {
+      _displayedMonth = DateTime(_displayedMonth.year, _displayedMonth.month - 1, 1);
+      _calculateMonthDays();
+      widget.onMonthYearChanged(); // Trigger data fetch for new month
+    });
+  }
+
+  void _goToNextMonth() {
+    setState(() {
+      _displayedMonth = DateTime(_displayedMonth.year, _displayedMonth.month + 1, 1);
+      _calculateMonthDays();
+      widget.onMonthYearChanged(); // Trigger data fetch for new month
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -268,7 +556,7 @@ class CalendarWidget extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: Colors.black12, blurRadius: 10),
+          const BoxShadow(color: Colors.black12, blurRadius: 10),
         ],
       ),
       child: Column(
@@ -276,27 +564,44 @@ class CalendarWidget extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Icon(Icons.chevron_left, color: Colors.grey),
-              _buildDropdown("Nov", ['Jan', 'Feb', 'Mar', 'Nov']),
-              _buildDropdown("2025", ['2023', '2024', '2025']),
-              const Icon(Icons.chevron_right, color: Colors.grey),
+              IconButton(
+                icon: const Icon(Icons.chevron_left, color: _primaryGreen),
+                onPressed: _goToPreviousMonth,
+              ),
+              Row(
+                children: [
+                  _buildDropdown(DateFormat.MMM().format(_displayedMonth), 
+                    [DateFormat.MMM().format(_displayedMonth)], 
+                    onChanged: (val) { /* Placeholder for real dropdown */ },
+                  ),
+                  const SizedBox(width: 8),
+                  _buildDropdown(DateFormat.y().format(_displayedMonth), 
+                    [DateFormat.y().format(_displayedMonth)], 
+                    onChanged: (val) { /* Placeholder for real dropdown */ },
+                  ),
+                ],
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right, color: _primaryGreen),
+                onPressed: _goToNextMonth,
+              ),
             ],
           ),
           const SizedBox(height: 16),
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              Text('Su', style: TextStyle(fontWeight: FontWeight.bold)),
-              Text('Mo', style: TextStyle(fontWeight: FontWeight.bold)),
-              Text('Tu', style: TextStyle(fontWeight: FontWeight.bold)),
-              Text('We', style: TextStyle(fontWeight: FontWeight.bold)),
-              Text('Th', style: TextStyle(fontWeight: FontWeight.bold)),
-              Text('Fr', style: TextStyle(fontWeight: FontWeight.bold)),
-              Text('Sa', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text('Su', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+              Text('Mo', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+              Text('Tu', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+              Text('We', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+              Text('Th', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+              Text('Fr', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+              Text('Sa', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
             ],
           ),
           const SizedBox(height: 12),
-          // Grid layout for dates (simplified for this example)
+          // Grid layout for dates
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -306,15 +611,57 @@ class CalendarWidget extends StatelessWidget {
               mainAxisSpacing: 8,
               crossAxisSpacing: 8,
             ),
-            itemCount: 30, // Example for 30 days
+            itemCount: _monthDays.length, 
             itemBuilder: (context, index) {
-              final day = index + 1;
-              return Center(
-                child: Text(
-                  day.toString(),
-                  style: TextStyle(
-                    fontWeight: day == 20 ? FontWeight.bold : FontWeight.normal,
-                    color: day == 20 ? _primaryGreen : Colors.black,
+              final dayDate = _monthDays[index];
+              final bool isCurrentMonth = dayDate.month == _displayedMonth.month;
+              final bool isSelected = DateFormat('yyyy-MM-dd').format(dayDate) == DateFormat('yyyy-MM-dd').format(widget.selectedDate);
+              final String dateKey = DateFormat('yyyy-MM-dd').format(dayDate);
+              final bool hasExpense = widget.dailyTotals.containsKey(dateKey) && widget.dailyTotals[dateKey]! > 0;
+              final bool isMostExpensive = dateKey == _mostExpensiveDayKey && hasExpense;
+              final bool isLeastExpensive = dateKey == _leastExpensiveDayKey && hasExpense;
+
+              Color dayTextColor = isCurrentMonth ? _primaryGreen : Colors.grey.shade400;
+              if (isSelected) {
+                dayTextColor = Colors.white;
+              } else if (isMostExpensive) {
+                 dayTextColor = Colors.red.shade800; // Most expensive day highlight
+              } else if (isLeastExpensive) {
+                 dayTextColor = _primaryGreen; // Least expensive day highlight
+              }
+
+              return InkWell(
+                onTap: isCurrentMonth ? () => widget.onDateSelected(dayDate.copyWith(hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0)) : null,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isSelected ? _primaryGreen : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isMostExpensive && !isSelected ? Colors.red.shade300 : Colors.transparent,
+                      width: isMostExpensive && !isSelected ? 1.5 : 0,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        dayDate.day.toString(),
+                        style: TextStyle(
+                          fontWeight: isSelected || hasExpense ? FontWeight.bold : FontWeight.normal,
+                          color: dayTextColor,
+                        ),
+                      ),
+                      if (hasExpense && !isSelected) // Show a dot for days with expenses
+                        Container(
+                          margin: const EdgeInsets.only(top: 2),
+                          width: 5,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: isMostExpensive ? Colors.red : _primaryGreen,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               );
@@ -325,7 +672,7 @@ class CalendarWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildDropdown(String value, List<String> items) {
+  Widget _buildDropdown(String value, List<String> items, {required Function(String?) onChanged}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -335,16 +682,14 @@ class CalendarWidget extends StatelessWidget {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
-          icon: const Icon(Icons.arrow_drop_down, color: Colors.grey),
+          icon: const Icon(Icons.arrow_drop_down, color: _primaryGreen),
           items: items.map<DropdownMenuItem<String>>((String item) {
             return DropdownMenuItem<String>(
               value: item,
-              child: Text(item),
+              child: Text(item, style: const TextStyle(fontWeight: FontWeight.bold, color: _primaryGreen)),
             );
           }).toList(),
-          onChanged: (String? newValue) {
-            // Placeholder: Handle month/year change
-          },
+          onChanged: onChanged,
         ),
       ),
     );
@@ -353,7 +698,6 @@ class CalendarWidget extends StatelessWidget {
 
 // ----------------- EXPENSE ITEM WIDGET (Remains the same) -----------------
 class ExpenseItem extends StatelessWidget {
-// ... (ExpenseItem code remains the same)
   final IconData icon;
   final String title;
   final String user;
