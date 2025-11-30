@@ -1,14 +1,34 @@
-import 'package:finsight/login/signup/signUp.dart';
+// login/signin.dart
 import 'package:flutter/material.dart';
-import 'package:finsight/pages/homepage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'signup.dart';
+import '/pages/homepage.dart';
 
-class SigninPage extends StatelessWidget {
+class SigninPage extends StatefulWidget {
   const SigninPage({super.key});
 
   @override
+  State<SigninPage> createState() => _SigninPageState();
+}
+
+class _SigninPageState extends State<SigninPage> {
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  bool _obscurePassword = true; // <-- Add this for toggle
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final Color fieldColor = const Color(0xFF9EB59A); // input field color
-    final Color buttonColor = const Color(0xFF387E5A); // login button color
+    final Color fieldColor = const Color(0xFF9EB59A);
+    final Color buttonColor = const Color(0xFF387E5A);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -19,8 +39,6 @@ class SigninPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 40),
-
-              // Logo Text
               const Text(
                 'FinSight',
                 style: TextStyle(
@@ -33,13 +51,9 @@ class SigninPage extends StatelessWidget {
               const SizedBox(height: 5),
               const Text(
                 'Smart Expense & Savings Tracker',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: Color.fromARGB(255, 0, 0, 0),
-                ),
+                style: TextStyle(fontSize: 15, color: Colors.black),
               ),
               const SizedBox(height: 40),
-
               const Text(
                 'Sign In',
                 style: TextStyle(
@@ -52,6 +66,7 @@ class SigninPage extends StatelessWidget {
 
               // Email
               buildTextField(
+                controller: emailController,
                 label: 'Email',
                 hint: 'Enter your Email',
                 icon: Icons.email_outlined,
@@ -60,135 +75,97 @@ class SigninPage extends StatelessWidget {
               ),
               const SizedBox(height: 15),
 
-              // Password
+              // Password with show/hide toggle
               buildTextField(
+                controller: passwordController,
                 label: 'Password',
                 hint: 'Enter your Password',
                 icon: Icons.lock_outline,
                 color: fieldColor,
-                obscureText: true,
+                obscureText: _obscurePassword,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                    color: Colors.white,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
               ),
               const SizedBox(height: 8),
 
-              // Remember me + Forgot password
+              // Remember me / forgot password
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
-                      Checkbox(
-                        value: true,
-                        onChanged: (value) {},
-                        activeColor: buttonColor,
-                      ),
+                      Checkbox(value: true, onChanged: (value) {}, activeColor: buttonColor),
                       const Text('Remember me'),
                     ],
                   ),
                   GestureDetector(
-                    onTap: () {
-                      // Navigate to Forgot Password screen
-                    },
+                    onTap: () {},
                     child: const Text(
                       'Forgot Password?',
-                      style: TextStyle(
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w500),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 25),
 
-              // Login Button
+              // LOGIN BUTTON
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: buttonColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const HomePage(),
-                      ),
-                    );
+                  onPressed: () async {
+                    String email = emailController.text.trim();
+                    String password = passwordController.text.trim();
+
+                    if (email.isEmpty || password.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Email and Password cannot be empty!"), backgroundColor: Colors.red),
+                      );
+                      return;
+                    }
+
+                    try {
+                      await _auth.signInWithEmailAndPassword(email: email, password: password);
+                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomePage()));
+                    } on FirebaseAuthException catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(e.message ?? "Login failed"), backgroundColor: Colors.red),
+                      );
+                    }
                   },
                   child: const Text(
                     'Login',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Colors.white),
                   ),
                 ),
               ),
 
               const SizedBox(height: 25),
-
-              const Text('-OR-', style: TextStyle(color: Colors.black87)),
-              const SizedBox(height: 15),
-
-              const Text(
-                'Sign in with',
-                style: TextStyle(color: Colors.black87),
-              ),
-              const SizedBox(height: 15),
-
-              // Google Button (Icon only)
-              GestureDetector(
-                onTap: () {
-                  // TODO: Add your Google sign-in logic here
-                  print("Google Sign-In clicked!");
-                },
-                child: Container(
-                  width: 45,
-                  height: 45,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.grey.shade400),
-                  ),
-                  child: Center(
-                    child: Image.asset(
-                      'assets/images/logo/gmail.png',
-                      width: 24,
-                      height: 24,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 25),
-
-              // Sign up link
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    "Don’t have an Account? ",
-                    style: TextStyle(color: Colors.black87),
-                  ),
+                  const Text("Don’t have an Account? ", style: TextStyle(color: Colors.black87)),
                   GestureDetector(
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SignupPage(),
-                        ),
-                      );
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const SignupPage()));
                     },
                     child: const Text(
                       "Sign up",
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -201,35 +178,33 @@ class SigninPage extends StatelessWidget {
   }
 
   Widget buildTextField({
+    required TextEditingController controller,
     required String label,
     required String hint,
     required IconData icon,
     required Color color,
     bool obscureText = false,
+    Widget? suffixIcon,
     TextInputType keyboardType = TextInputType.text,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 14, color: Colors.black87),
-        ),
+        Text(label, style: const TextStyle(fontSize: 14, color: Colors.black87)),
         const SizedBox(height: 6),
         TextField(
+          controller: controller,
           obscureText: obscureText,
           keyboardType: keyboardType,
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: Colors.white),
+            suffixIcon: suffixIcon,
             hintText: hint,
             hintStyle: const TextStyle(color: Colors.white),
             filled: true,
             fillColor: color,
             contentPadding: const EdgeInsets.symmetric(vertical: 10),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: BorderSide.none,
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide.none),
           ),
         ),
       ],
