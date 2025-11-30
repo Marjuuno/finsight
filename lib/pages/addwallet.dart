@@ -1,19 +1,101 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'homepage.dart';
 
-class AddWalletPage extends StatelessWidget {
+class AddWalletPage extends StatefulWidget {
   const AddWalletPage({super.key});
+
+  @override
+  State<AddWalletPage> createState() => _AddWalletPageState();
+}
+
+class _AddWalletPageState extends State<AddWalletPage> {
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController balanceController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    balanceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addWallet() async {
+    String name = nameController.text.trim();
+    String balanceText = balanceController.text.trim();
+
+    if (name.isEmpty || balanceText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter both wallet name and balance'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    double? balance = double.tryParse(balanceText);
+    if (balance == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Balance must be a valid number'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final User? user = _auth.currentUser;
+      if (user == null) throw Exception("User not logged in");
+
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('wallets')
+          .add({
+        'name': name,
+        'balance': balance,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Wallet "$name" added with ₱$balance'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Navigate to HomePage and remove AddWalletPage from stack
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const HomePage()),
+        (route) => false,
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error adding wallet: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFC9DDB9), // Background color from the image
+      backgroundColor: const Color(0xFFC9DDB9),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
           onPressed: () {
-            Navigator.pop(context); // Go back to the previous screen
+            Navigator.pop(context);
           },
         ),
       ),
@@ -28,18 +110,15 @@ class AddWalletPage extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF558B6E), // Dark green for the title
+                  color: Color(0xFF558B6E),
                 ),
               ),
               const SizedBox(height: 30),
-
-              // Piggybank Image
               Image.asset(
-                'assets/images/logo/piggybank.png', // Your provided image path
-                height: 200, // Adjust size as needed
+                'assets/images/logo/piggybank.png',
+                height: 200,
               ),
               const SizedBox(height: 30),
-
               const Text(
                 'Secure savings into a wallet.',
                 textAlign: TextAlign.center,
@@ -49,9 +128,8 @@ class AddWalletPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 30),
-
-              // Wallet Name TextField
               TextField(
+                controller: nameController,
                 decoration: InputDecoration(
                   hintText: 'Wallet Name',
                   fillColor: Colors.white,
@@ -65,9 +143,8 @@ class AddWalletPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-
-              // Initial Balance TextField
               TextField(
+                controller: balanceController,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   hintText: 'Initial Balance',
@@ -82,15 +159,13 @@ class AddWalletPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 40),
-
-              // Action Buttons (Cancel and Add)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () {
-                        Navigator.pop(context); // Cancel and go back
+                        Navigator.pop(context);
                       },
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF558B6E),
@@ -109,13 +184,9 @@ class AddWalletPage extends StatelessWidget {
                   const SizedBox(width: 20),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
-                        // Handle adding the wallet logic here
-                        print('Add Wallet button pressed');
-                        Navigator.pop(context); // Go back after adding
-                      },
+                      onPressed: _addWallet,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF558B6E), // Dark green
+                        backgroundColor: const Color(0xFF558B6E),
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(15),

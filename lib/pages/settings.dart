@@ -33,6 +33,53 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
+  void _signOut() async {
+    try {
+      await FirebaseAuth.instance.signOut();
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const SigninPage()),
+        (Route<dynamic> route) => false,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Signed out successfully."),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to sign out: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _navigateToAddPage(String page) {
+    _toggleAddMenu();
+    Widget target;
+
+    switch (page) {
+      case 'Add Wallet':
+        target = const AddWalletPage();
+        break;
+      case 'Add User':
+        target = const AddUserPage();
+        break;
+      case 'Add Expenses':
+        target = const AddExpensePage();
+        break;
+      default:
+        return;
+    }
+
+    Navigator.push(context, MaterialPageRoute(builder: (context) => target));
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -57,68 +104,20 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         body: Stack(
           children: [
-            // Main content
             SafeArea(
               child: SingleChildScrollView(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _buildSettingsListTile(
-                        context: context,
-                        icon: Icons.person_outline,
-                        title: 'Profile',
-                        onTap: () => print('Navigate to Profile')),
-                    _buildSettingsListTile(
-                        context: context,
-                        icon: Icons.notifications_none,
-                        title: 'Notifications',
-                        onTap: () => print('Navigate to Notifications')),
-                    _buildSettingsListTile(
-                        context: context,
-                        icon: Icons.work_outline,
-                        title: 'Linked Wallets',
-                        onTap: () => print('Navigate to Linked Wallets')),
-                    _buildSettingsListTile(
-                        context: context,
-                        icon: Icons.people_outline,
-                        title: 'Roles',
-                        onTap: () => print('Navigate to Roles')),
-                    _buildSettingsListTile(
-                        context: context,
-                        icon: Icons.settings,
-                        title: 'App Preferences',
-                        onTap: () => print('Navigate to App Preferences')),
-
+                    _buildSettingsListTile(Icons.person_outline, 'Profile', () => print('Profile')),
+                    _buildSettingsListTile(Icons.notifications_none, 'Notifications', () => print('Notifications')),
+                    _buildSettingsListTile(Icons.work_outline, 'Linked Wallets', () => print('Linked Wallets')),
+                    _buildSettingsListTile(Icons.people_outline, 'Roles', () => print('Roles')),
+                    _buildSettingsListTile(Icons.settings, 'App Preferences', () => print('App Preferences')),
                     const SizedBox(height: 60),
-
-                    // Sign Out Button
                     ElevatedButton(
-                      onPressed: () async {
-                        try {
-                          // Firebase logout
-                          await FirebaseAuth.instance.signOut();
-
-                          // Close menu if open
-                          if (_showAddMenu) _toggleAddMenu();
-
-                          // Navigate to SignInPage and remove history
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => const SigninPage()),
-                            (Route<dynamic> route) => false,
-                          );
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text("Failed to sign out: $e"),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      },
+                      onPressed: _signOut,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _buttonColor,
                         foregroundColor: _primaryGreen,
@@ -131,27 +130,22 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                       child: const Text(
                         'Sign Out',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-
-            // Pop-up Add Menu
-            if (_showAddMenu) _buildAddMenuOverlay(context),
+            if (_showAddMenu) _buildAddMenuOverlay(),
           ],
         ),
-
-        bottomNavigationBar: _buildBottomNavigationBar(context),
+        bottomNavigationBar: _buildBottomNavigationBar(),
       ),
     );
   }
 
-  // Pop-Up Menu Overlay
-  Widget _buildAddMenuOverlay(BuildContext context) {
+  Widget _buildAddMenuOverlay() {
     return Positioned(
       bottom: 31,
       left: 0,
@@ -190,26 +184,12 @@ class _SettingsPageState extends State<SettingsPage> {
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: () {
-            _toggleAddMenu();
-            if (text == 'Add Wallet') {
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (context) => const AddWalletPage()));
-            } else if (text == 'Add User') {
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (context) => const AddUserPage()));
-            } else if (text == 'Add Expenses') {
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (context) => const AddExpensePage()));
-            }
-          },
+          onPressed: () => _navigateToAddPage(text),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
             foregroundColor: Colors.black87,
             padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             elevation: 1,
           ),
           child: Text(
@@ -221,12 +201,7 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildSettingsListTile({
-    required BuildContext context,
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildSettingsListTile(IconData icon, String title, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -238,8 +213,7 @@ class _SettingsPageState extends State<SettingsPage> {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
-                    fontSize: 20, color: _primaryGreen, fontWeight: FontWeight.w500),
+                style: const TextStyle(fontSize: 20, color: _primaryGreen, fontWeight: FontWeight.w500),
               ),
             ),
           ],
@@ -248,7 +222,7 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildBottomNavigationBar(BuildContext context) {
+  Widget _buildBottomNavigationBar() {
     return Container(
       decoration: const BoxDecoration(
         color: _accentGreen,
@@ -258,8 +232,8 @@ class _SettingsPageState extends State<SettingsPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _navBarItem(context, Icons.home, const HomePage()),
-          _navBarItem(context, Icons.groups_2, const SharedBudget()),
+          _navBarItem(Icons.home, const HomePage()),
+          _navBarItem(Icons.groups_2, const SharedBudget()),
           InkWell(
             onTap: _toggleAddMenu,
             child: const CircleAvatar(
@@ -268,15 +242,14 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Icon(Icons.add, color: Colors.white, size: 34),
             ),
           ),
-          _navBarItem(context, Icons.credit_card_outlined, const ExpensesPage()),
-          _navBarItem(context, Icons.settings, const SettingsPage(), isCurrent: true),
+          _navBarItem(Icons.credit_card_outlined, const ExpensesPage()),
+          _navBarItem(Icons.settings, const SettingsPage(), isCurrent: true),
         ],
       ),
     );
   }
 
-  Widget _navBarItem(BuildContext context, IconData icon, Widget targetPage,
-      {bool isCurrent = false}) {
+  Widget _navBarItem(IconData icon, Widget targetPage, {bool isCurrent = false}) {
     return InkWell(
       onTap: () {
         if (!isCurrent) {

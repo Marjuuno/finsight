@@ -1,17 +1,18 @@
-import 'package:finsight/pages/addexpenses.dart';
-import 'package:finsight/pages/adduser.dart';
-import 'package:finsight/pages/addwallet.dart';
-import 'package:finsight/pages/expenses.dart';
-import 'package:finsight/pages/settings.dart';
-import 'package:finsight/pages/sharedbudget.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'addwallet.dart';
+import 'addexpenses.dart';
+import 'adduser.dart';
+import 'expenses.dart';
+import 'settings.dart';
+import 'sharedbudget.dart';
 
 // Theme colors
 const Color _accentGreen = Color(0xFF94A780);
-const Color _centerButtonColor = Colors.orange; // Updated to be closer to image color
-const Color _popUpGreen = Color(0xFF558B6E); // Dark Green from the pop-up image
+const Color _centerButtonColor = Colors.orange;
+const Color _popUpGreen = Color(0xFF558B6E);
 
-// Convert to StatefulWidget to manage the pop-up state
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -20,8 +21,14 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // State variable to control the visibility of the pop-up menu
   bool _showAddMenu = false;
+  double totalBalance = 0.0; // <-- dynamic balance
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchBalance();
+  }
 
   void _toggleAddMenu() {
     setState(() {
@@ -29,21 +36,41 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  /// Fetch wallets and calculate total balance
+  Future<void> _fetchBalance() async {
+    try {
+      final User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      QuerySnapshot walletsSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('wallets')
+          .get();
+
+      double sum = 0.0;
+      for (var doc in walletsSnapshot.docs) {
+        sum += (doc['balance'] ?? 0).toDouble();
+      }
+
+      setState(() {
+        totalBalance = sum;
+      });
+    } catch (e) {
+      print('Error fetching balance: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Wrap the entire screen in a GestureDetector to close the menu when tapping anywhere outside
     return GestureDetector(
       onTap: () {
-        if (_showAddMenu) {
-          _toggleAddMenu();
-        }
+        if (_showAddMenu) _toggleAddMenu();
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF5F5F5),
-        // Use Stack to layer the main content and the pop-up menu
         body: Stack(
           children: [
-            // 1. Main Content Area
             SafeArea(
               child: SingleChildScrollView(
                 child: Column(
@@ -55,12 +82,8 @@ class _HomePageState extends State<HomePage> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Greeting Chip
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
                               color: const Color(0xFF9CC9A0),
                               borderRadius: BorderRadius.circular(20),
@@ -86,14 +109,11 @@ class _HomePageState extends State<HomePage> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
-                          boxShadow: const [
-                            BoxShadow(color: Colors.black12, blurRadius: 10),
-                          ],
+                          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            // First line: "INSIGHT into"
                             Text.rich(
                               TextSpan(
                                 children: [
@@ -101,11 +121,11 @@ class _HomePageState extends State<HomePage> {
                                     text: "INSIGHT ",
                                     style: TextStyle(
                                       fontSize: 28,
-                                      color: Color(0xFFE0A20C), // Golden color
+                                      color: Color(0xFFE0A20C),
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  TextSpan(
+                                  const TextSpan(
                                     text: " into",
                                     style: TextStyle(
                                       fontSize: 22,
@@ -115,22 +135,18 @@ class _HomePageState extends State<HomePage> {
                                 ],
                               ),
                             ),
-                            // Second line: "every PESO"
                             Text.rich(
                               TextSpan(
                                 children: [
                                   const TextSpan(
                                     text: "every ",
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      color: Colors.black,
-                                    ),
+                                    style: TextStyle(fontSize: 22, color: Colors.black),
                                   ),
-                                  const TextSpan(
-                                    text: " PESO",
+                                  TextSpan(
+                                    text: "PESO",
                                     style: TextStyle(
                                       fontSize: 28,
-                                      color: Color(0xFF0E8A41), // Green color
+                                      color: const Color(0xFF0E8A41),
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -152,7 +168,6 @@ class _HomePageState extends State<HomePage> {
                         style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                     ),
-
                     const SizedBox(height: 10),
 
                     Center(
@@ -163,16 +178,16 @@ class _HomePageState extends State<HomePage> {
                           color: const Color(0xFFAFBCA8),
                           borderRadius: BorderRadius.circular(18),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            StatusItem(
+                            const StatusItem(
                               icon: Icons.wallet,
                               label: "Spending",
                               amount: "-₱10,000",
                               color: Colors.red,
                             ),
-                            StatusItem(
+                            const StatusItem(
                               icon: Icons.attach_money,
                               label: "Income",
                               amount: "₱15,000",
@@ -181,7 +196,7 @@ class _HomePageState extends State<HomePage> {
                             StatusItem(
                               icon: Icons.savings,
                               label: "Balance",
-                              amount: "₱5,000",
+                              amount: "₱${totalBalance.toStringAsFixed(2)}", // <-- dynamic balance
                               color: Colors.black87,
                             ),
                           ],
@@ -199,7 +214,6 @@ class _HomePageState extends State<HomePage> {
                         style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                     ),
-
                     const SizedBox(height: 10),
 
                     Center(
@@ -209,9 +223,7 @@ class _HomePageState extends State<HomePage> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(18),
-                          boxShadow: [
-                            BoxShadow(color: Colors.black12, blurRadius: 8),
-                          ],
+                          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
                         ),
                         child: const Column(
                           children: [
@@ -237,14 +249,12 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 80),
                   ],
                 ),
               ),
             ),
 
-            // 2. Pop-Up Menu Overlay (only visible when _showAddMenu is true)
             if (_showAddMenu) _buildAddMenuOverlay(context),
           ],
         ),
