@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-// Theme colors from the application
-const Color _accentGreen = Color(0xFF94A780); // Light green for main sections
-const Color _darkGreen = Color(0xFF558B6E);   // Dark green for buttons/header
+const Color _accentGreen = Color(0xFF94A780);
+const Color _darkGreen = Color(0xFF558B6E);
 
 class AddExpensePage extends StatefulWidget {
   const AddExpensePage({super.key});
@@ -12,7 +13,6 @@ class AddExpensePage extends StatefulWidget {
 }
 
 class _AddExpensePageState extends State<AddExpensePage> {
-  // Define the expense categories and their icons
   final List<Map<String, dynamic>> _categories = [
     {'name': 'Health', 'icon': Icons.favorite_border},
     {'name': 'Transportation', 'icon': Icons.directions_car_filled_outlined},
@@ -30,8 +30,19 @@ class _AddExpensePageState extends State<AddExpensePage> {
 
   String? _selectedCategory;
   TextEditingController _dateController = TextEditingController();
+  TextEditingController _amountController = TextEditingController();
+  TextEditingController _notesController = TextEditingController();
 
-  // Helper widget for a single category item
+  // Hardcoded owner to avoid dropdown issues
+  final String _owner = "Owner";
+
+  @override
+  void initState() {
+    super.initState();
+    final today = DateTime.now();
+    _dateController.text = "${today.month}/${today.day}/${today.year}";
+  }
+
   Widget _buildCategoryItem(Map<String, dynamic> category) {
     bool isSelected = _selectedCategory == category['name'];
     return InkWell(
@@ -80,7 +91,6 @@ class _AddExpensePageState extends State<AddExpensePage> {
     );
   }
 
-  // Function to show the date picker
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -95,12 +105,75 @@ class _AddExpensePageState extends State<AddExpensePage> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    // Initialize date field with today's date
-    final today = DateTime.now();
-    _dateController.text = "${today.month}/${today.day}/${today.year}";
+  Future<void> _addExpense() async {
+    if (_amountController.text.isEmpty || _selectedCategory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please fill all required fields.")),
+      );
+      return;
+    }
+
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    double amount = double.tryParse(_amountController.text) ?? 0;
+
+    // Add expense to Firestore
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('expenses')
+        .add({
+      'owner': _owner,
+      'category': _selectedCategory,
+      'amount': amount,
+      'date': _dateController.text,
+      'notes': _notesController.text,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+
+    // Update wallet balance
+    QuerySnapshot walletsSnapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('wallets')
+        .where('owner', isEqualTo: _owner)
+        .get();
+
+    if (walletsSnapshot.docs.isNotEmpty) {
+      var walletDoc = walletsSnapshot.docs.first;
+      double currentBalance = (walletDoc['balance'] ?? 0).toDouble();
+      await walletDoc.reference.update({'balance': currentBalance - amount});
+    }
+
+    // Show popup/snackbar after successfully adding expense
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("You added ₱$amount successfully!"),
+        duration: const Duration(seconds: 2),
+        backgroundColor: Colors.green,
+      ),
+    );
+
+    Navigator.pop(context); // Return to previous page
+  }
+
+  Widget _buildInfoBox(String text, IconData icon, {bool showBorder = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: showBorder ? Border.all(color: Colors.grey.shade300) : null,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(text, style: const TextStyle(color: Colors.black87)),
+          Icon(icon, color: _darkGreen),
+        ],
+      ),
+    );
   }
 
   @override
@@ -108,7 +181,6 @@ class _AddExpensePageState extends State<AddExpensePage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        // Transparent app bar for a full-screen look
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
@@ -121,7 +193,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header Section
+            // Header
             Container(
               padding: const EdgeInsets.all(15),
               decoration: BoxDecoration(
@@ -145,7 +217,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
             Container(
               padding: const EdgeInsets.all(15),
               decoration: BoxDecoration(
-                color: const Color(0xFFC9DDB9), // Lighter green for the category box
+                color: const Color(0xFFC9DDB9),
                 borderRadius: BorderRadius.circular(15),
               ),
               child: GridView.builder(
@@ -156,123 +228,58 @@ class _AddExpensePageState extends State<AddExpensePage> {
                   crossAxisCount: 4,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
-                  childAspectRatio: 0.75, // Adjusts height to fit text below icon
+                  childAspectRatio: 0.75,
                 ),
-                itemBuilder: (context, index) {
-                  return _buildCategoryItem(_categories[index]);
-                },
+                itemBuilder: (context, index) =>
+                    _buildCategoryItem(_categories[index]),
               ),
             ),
             const SizedBox(height: 20),
 
-            // Wallet Selector (Placeholder)
-            _buildInfoBox('WALLET 1', Icons.wallet_outlined),
+            // Owner (hardcoded)
+            _buildInfoBox(_owner, Icons.person_outline, showBorder: true),
             const SizedBox(height: 20),
 
-            // Amount, Date, and Owner Row
-            Row(
-              children: [
-                // Amount Input
-                Expanded(
-                  flex: 3,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.shopping_bag_outlined, color: _darkGreen),
-                        const SizedBox(width: 8),
-                        const Text('Amount', style: TextStyle(color: Colors.grey)),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: '₱',
-                              items: const [
-                                DropdownMenuItem(value: '₱', child: Text('₱')),
-                                // Add other currency options if needed
-                              ],
-                              onChanged: (value) {},
-                            ),
-                          ),
-                        ),
-                        // Actual text field for amount
-                        const Expanded(
-                          flex: 3,
-                          child: TextField(
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              hintText: '0.00',
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                            textAlign: TextAlign.end,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+            // Amount
+            TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Amount',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
                 ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Date and Owner Fields
-            Row(
-              children: [
-                // Date Picker
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _selectDate(context),
-                    child: _buildInfoBox(
-                      _dateController.text.isNotEmpty
-                          ? _dateController.text
-                          : 'mm/dd/yyyy',
-                      Icons.calendar_month,
-                      showBorder: true,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 15),
-                // Owner
-                Expanded(
-                  child: _buildInfoBox('Owner', Icons.person_outline, showBorder: true),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Notes Section
-            Container(
-              height: 120,
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: Colors.grey.shade300),
               ),
-              child: const TextField(
-                maxLines: 5,
-                decoration: InputDecoration(
-                  hintText: 'Notes',
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
+            ),
+            const SizedBox(height: 20),
+
+            // Date picker
+            InkWell(
+              onTap: () => _selectDate(context),
+              child: _buildInfoBox(_dateController.text, Icons.calendar_month,
+                  showBorder: true),
+            ),
+            const SizedBox(height: 20),
+
+            // Notes
+            TextField(
+              controller: _notesController,
+              maxLines: 5,
+              decoration: InputDecoration(
+                labelText: 'Notes',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
                 ),
               ),
             ),
             const SizedBox(height: 40),
 
-            // Action Buttons (Cancel and Add)
+            // Buttons
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context), // Cancel
+                    onPressed: () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _darkGreen,
                       side: const BorderSide(color: _darkGreen),
@@ -287,11 +294,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
                 const SizedBox(width: 20),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {
-                      // Handle adding the expense logic here
-                      print('Add Expense button pressed');
-                      Navigator.pop(context); // Go back after adding
-                    },
+                    onPressed: _addExpense,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _darkGreen,
                       foregroundColor: Colors.white,
@@ -308,25 +311,6 @@ class _AddExpensePageState extends State<AddExpensePage> {
             const SizedBox(height: 20),
           ],
         ),
-      ),
-    );
-  }
-
-  // Helper widget for Wallet, Date, and Owner boxes
-  Widget _buildInfoBox(String text, IconData icon, {bool showBorder = false}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        border: showBorder ? Border.all(color: Colors.grey.shade300) : null,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(text, style: const TextStyle(color: Colors.black87)),
-          Icon(icon, color: _darkGreen),
-        ],
       ),
     );
   }

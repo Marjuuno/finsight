@@ -22,12 +22,14 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   bool _showAddMenu = false;
-  double totalBalance = 0.0; // <-- dynamic balance
+  double totalIncome = 0.0;     // Total from wallets
+  double totalSpending = 0.0;   // Total from expenses
+  double totalBalance = 0.0;    // Income - Spending
 
   @override
   void initState() {
     super.initState();
-    _fetchBalance();
+    _fetchData();
   }
 
   void _toggleAddMenu() {
@@ -36,28 +38,43 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  /// Fetch wallets and calculate total balance
-  Future<void> _fetchBalance() async {
+  /// Fetch wallets and expenses
+  Future<void> _fetchData() async {
     try {
       final User? user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
+      // Total Income (sum of wallets)
       QuerySnapshot walletsSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('wallets')
           .get();
 
-      double sum = 0.0;
+      double incomeSum = 0.0;
       for (var doc in walletsSnapshot.docs) {
-        sum += (doc['balance'] ?? 0).toDouble();
+        incomeSum += (doc['balance'] ?? 0).toDouble();
+      }
+
+      // Total Spending (sum of expenses)
+      QuerySnapshot expensesSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('expenses')
+          .get();
+
+      double spendingSum = 0.0;
+      for (var doc in expensesSnapshot.docs) {
+        spendingSum += (doc['amount'] ?? 0).toDouble();
       }
 
       setState(() {
-        totalBalance = sum;
+        totalIncome = incomeSum;
+        totalSpending = spendingSum;
+        totalBalance = totalIncome - totalSpending;
       });
     } catch (e) {
-      print('Error fetching balance: $e');
+      print('Error fetching data: $e');
     }
   }
 
@@ -181,22 +198,22 @@ class _HomePageState extends State<HomePage> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            const StatusItem(
+                            StatusItem(
                               icon: Icons.wallet,
                               label: "Spending",
-                              amount: "-₱10,000",
+                              amount: "-₱${totalSpending.toStringAsFixed(2)}",
                               color: Colors.red,
                             ),
-                            const StatusItem(
+                            StatusItem(
                               icon: Icons.attach_money,
                               label: "Income",
-                              amount: "₱15,000",
+                              amount: "₱${totalIncome.toStringAsFixed(2)}",
                               color: Colors.green,
                             ),
                             StatusItem(
                               icon: Icons.savings,
                               label: "Balance",
-                              amount: "₱${totalBalance.toStringAsFixed(2)}", // <-- dynamic balance
+                              amount: "₱${totalBalance.toStringAsFixed(2)}",
                               color: Colors.black87,
                             ),
                           ],
@@ -263,17 +280,15 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Pop-Up Menu Widget, positioned above the Navigation Bar
+  /// Pop-Up Menu
   Widget _buildAddMenuOverlay(BuildContext context) {
-    // The Positioned widget places the menu in the Stack
     return Positioned(
-      // 70 (NavBar height) + ~30 (margin/padding) = 100
-      bottom: 250, 
+      bottom: 250,
       left: 0,
       right: 0,
       child: Center(
         child: Container(
-          width: 230, // Adjust width to fit the pop-up look
+          width: 230,
           padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
           decoration: BoxDecoration(
             color: _popUpGreen,
@@ -299,7 +314,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-/// Helper for the white buttons inside the pop-up menu
   Widget _buildPopUpButton(String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5.0),
@@ -307,7 +321,7 @@ class _HomePageState extends State<HomePage> {
         width: double.infinity,
         child: ElevatedButton(
           onPressed: () {
-            _toggleAddMenu(); // Close the menu regardless of the action
+            _toggleAddMenu();
 
             if (text == 'Add Wallet') {
               Navigator.push(
@@ -315,20 +329,15 @@ class _HomePageState extends State<HomePage> {
                 MaterialPageRoute(builder: (context) => const AddWalletPage()),
               );
             } else if (text == 'Add User') {
-              // New logic for Add User
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const AddUserPage()),
               );
             } else if (text == 'Add Expenses') {
-              // New logic for Add Expenses
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const AddExpensePage()),
               );
-            } else {
-              // Handle other actions like 'Add User' or 'Add Expenses'
-              print('$text clicked!');
             }
           },
           style: ElevatedButton.styleFrom(
@@ -349,7 +358,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Bottom Navigation Bar implementation (mostly reused from your code)
+  /// Bottom NavBar
   Widget _buildBottomNavigationBar(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
@@ -362,9 +371,8 @@ class _HomePageState extends State<HomePage> {
         children: [
           _navBarItem(context, Icons.home, const HomePage(), isCurrent: true),
           _navBarItem(context, Icons.groups_2, const SharedBudget()),
-          // Interactive Center Button
           InkWell(
-            onTap: _toggleAddMenu, // Toggles the pop-up menu
+            onTap: _toggleAddMenu,
             child: const CircleAvatar(
               radius: 28,
               backgroundColor: _centerButtonColor,
@@ -378,11 +386,10 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Nav Bar Item helper function
-  Widget _navBarItem(BuildContext context, IconData icon, Widget targetPage, {bool isCurrent = false}) {
+  Widget _navBarItem(BuildContext context, IconData icon, Widget targetPage,
+      {bool isCurrent = false}) {
     return InkWell(
       onTap: () {
-        // Prevent navigating if the current page is already selected or if we're tapping the 'Add' button placeholder
         if (!isCurrent) {
           Navigator.pushReplacement(
             context,
@@ -399,9 +406,8 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// ----------------- STATUS WIDGET (Reused) -----------------
+// ----------------- STATUS ITEM -----------------
 class StatusItem extends StatelessWidget {
-// ... (StatusItem code remains the same)
   final IconData icon;
   final String label;
   final String amount;
@@ -431,9 +437,8 @@ class StatusItem extends StatelessWidget {
   }
 }
 
-// ----------------- ACTIVITY ITEM (Reused) -----------------
+// ----------------- ACTIVITY ITEM -----------------
 class ActivityItem extends StatelessWidget {
-// ... (ActivityItem code remains the same)
   final IconData icon;
   final String title;
   final String date;
