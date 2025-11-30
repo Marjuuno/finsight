@@ -8,6 +8,7 @@ import 'expenses.dart';
 import 'settings.dart';
 import 'sharedbudget.dart';
 
+// Theme colors
 const Color _accentGreen = Color(0xFF94A780);
 const Color _centerButtonColor = Colors.orange;
 const Color _popUpGreen = Color(0xFF558B6E);
@@ -24,7 +25,6 @@ class _HomePageState extends State<HomePage> {
   double totalIncome = 0.0;
   double totalSpending = 0.0;
   double totalBalance = 0.0;
-
   List<Map<String, dynamic>> expenses = [];
 
   @override
@@ -39,12 +39,13 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  /// Fetch wallets and expenses
   Future<void> _fetchData() async {
     try {
       final User? user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      // ---------- Fetch wallets ----------
+      // Fetch wallets
       QuerySnapshot walletsSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -57,12 +58,11 @@ class _HomePageState extends State<HomePage> {
         sumIncome += (data['balance'] ?? 0).toDouble();
       }
 
-      // ---------- Fetch expenses ----------
+      // Fetch expenses
       QuerySnapshot expensesSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('expenses')
-          .orderBy('date', descending: true)
           .get();
 
       double sumSpending = 0.0;
@@ -71,11 +71,8 @@ class _HomePageState extends State<HomePage> {
       for (var doc in expensesSnapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
         double amount = (data['amount'] ?? 0).toDouble();
-
-        // Only consider as expense (we can filter by type if your Firestore has it)
         sumSpending += amount;
 
-        // Add to activity
         fetchedExpenses.add({
           'category': data['category'] ?? 'Unknown',
           'amount': amount,
@@ -87,11 +84,14 @@ class _HomePageState extends State<HomePage> {
         });
       }
 
+      // Sort latest first
+      fetchedExpenses.sort((a, b) => b['date'].compareTo(a['date']));
+
       setState(() {
         totalIncome = sumIncome;
         totalSpending = sumSpending;
         totalBalance = totalIncome - totalSpending;
-        expenses = fetchedExpenses.take(4).toList(); // Show only 4 recent
+        expenses = fetchedExpenses.take(4).toList(); // max 4 items
       });
     } catch (e) {
       print('Error fetching data: $e');
@@ -144,36 +144,35 @@ class _HomePageState extends State<HomePage> {
         body: Stack(
           children: [
             SafeArea(
-              child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // -------- Header --------
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF9CC9A0),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              "Hello, User!",
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                            ),
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF9CC9A0),
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          const Icon(Icons.notifications_none, size: 28),
-                        ],
-                      ),
+                          child: const Text(
+                            "Hello, User!",
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        const Icon(Icons.notifications_none, size: 28),
+                      ],
                     ),
+                    const SizedBox(height: 20),
 
-                    // -------- Insight --------
+                    // Insight Card
                     Center(
                       child: Container(
-                        width: 330,
+                        width: double.infinity,
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -187,14 +186,16 @@ class _HomePageState extends State<HomePage> {
                               TextSpan(
                                 children: [
                                   const TextSpan(
-                                      text: "INSIGHT ",
-                                      style: TextStyle(
-                                          fontSize: 28,
-                                          color: Color(0xFFE0A20C),
-                                          fontWeight: FontWeight.bold)),
+                                    text: "INSIGHT ",
+                                    style: TextStyle(
+                                        fontSize: 28,
+                                        color: Color(0xFFE0A20C),
+                                        fontWeight: FontWeight.bold),
+                                  ),
                                   const TextSpan(
-                                      text: " into",
-                                      style: TextStyle(fontSize: 22, color: Colors.black)),
+                                    text: " into",
+                                    style: TextStyle(fontSize: 22, color: Colors.black),
+                                  ),
                                 ],
                               ),
                             ),
@@ -202,13 +203,16 @@ class _HomePageState extends State<HomePage> {
                               TextSpan(
                                 children: [
                                   const TextSpan(
-                                      text: "every ", style: TextStyle(fontSize: 22, color: Colors.black)),
+                                    text: "every ",
+                                    style: TextStyle(fontSize: 22, color: Colors.black),
+                                  ),
                                   TextSpan(
-                                      text: "PESO",
-                                      style: TextStyle(
-                                          fontSize: 28,
-                                          color: const Color(0xFF0E8A41),
-                                          fontWeight: FontWeight.bold)),
+                                    text: "PESO",
+                                    style: TextStyle(
+                                        fontSize: 28,
+                                        color: const Color(0xFF0E8A41),
+                                        fontWeight: FontWeight.bold),
+                                  ),
                                 ],
                               ),
                             ),
@@ -216,18 +220,14 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 20),
 
-                    const SizedBox(height: 25),
-
-                    // -------- Status --------
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Text("Status", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                    ),
+                    // Status Section
+                    const Text("Status", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 10),
                     Center(
                       child: Container(
-                        width: 330,
+                        width: double.infinity,
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: const Color(0xFFAFBCA8),
@@ -237,39 +237,32 @@ class _HomePageState extends State<HomePage> {
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
                             StatusItem(
-                              icon: Icons.wallet,
-                              label: "Spending",
-                              amount: "-₱${totalSpending.toStringAsFixed(2)}",
-                              color: Colors.red,
-                            ),
+                                icon: Icons.wallet,
+                                label: "Spending",
+                                amount: "-₱${totalSpending.toStringAsFixed(2)}",
+                                color: Colors.red),
                             StatusItem(
-                              icon: Icons.attach_money,
-                              label: "Income",
-                              amount: "₱${totalIncome.toStringAsFixed(2)}",
-                              color: Colors.green,
-                            ),
+                                icon: Icons.attach_money,
+                                label: "Income",
+                                amount: "₱${totalIncome.toStringAsFixed(2)}",
+                                color: Colors.green),
                             StatusItem(
-                              icon: Icons.savings,
-                              label: "Balance",
-                              amount: "₱${totalBalance.toStringAsFixed(2)}",
-                              color: Colors.black87,
-                            ),
+                                icon: Icons.savings,
+                                label: "Balance",
+                                amount: "₱${totalBalance.toStringAsFixed(2)}",
+                                color: Colors.black87),
                           ],
                         ),
                       ),
                     ),
+                    const SizedBox(height: 20),
 
-                    const SizedBox(height: 25),
-
-                    // -------- Activity --------
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Text("Activity", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                    ),
+                    // Activity Section
+                    const Text("Activity", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 10),
-                    Center(
+                    Expanded(
                       child: Container(
-                        width: 330,
+                        width: double.infinity,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -277,31 +270,34 @@ class _HomePageState extends State<HomePage> {
                           boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
                         ),
                         child: expenses.isEmpty
-                            ? const Padding(
-                                padding: EdgeInsets.all(20.0),
+                            ? const Center(
                                 child: Text(
                                   "No expenses recorded.",
                                   style: TextStyle(color: Colors.grey),
                                   textAlign: TextAlign.center,
                                 ),
                               )
-                            : Column(
-                                children: expenses.map((expense) {
+                            : ListView.builder(
+                                itemCount: expenses.length,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemBuilder: (context, index) {
+                                  final expense = expenses[index];
                                   return ActivityItem(
                                     icon: _getIconForCategory(expense['category']),
                                     title: expense['category'],
                                     date: _formatDate(expense['date']),
                                     amount: "-₱${expense['amount'].toStringAsFixed(2)}",
                                   );
-                                }).toList(),
+                                },
                               ),
                       ),
                     ),
-                    const SizedBox(height: 80),
+                    const SizedBox(height: 55),
                   ],
                 ),
               ),
             ),
+
             if (_showAddMenu) _buildAddMenuOverlay(context),
           ],
         ),
@@ -310,10 +306,9 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // ---------------- PopUp ----------------
   Widget _buildAddMenuOverlay(BuildContext context) {
     return Positioned(
-      bottom: 250,
+      bottom: 281,
       left: 0,
       right: 0,
       child: Center(
@@ -323,7 +318,13 @@ class _HomePageState extends State<HomePage> {
           decoration: BoxDecoration(
             color: _popUpGreen,
             borderRadius: BorderRadius.circular(25),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5))],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -367,7 +368,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // ---------------- Bottom Nav ----------------
   Widget _buildBottomNavigationBar(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
@@ -407,7 +407,7 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// ---------------- Status Item ----------------
+// ----------------- STATUS ITEM -----------------
 class StatusItem extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -429,7 +429,7 @@ class StatusItem extends StatelessWidget {
   }
 }
 
-// ---------------- Activity Item ----------------
+// ----------------- ACTIVITY ITEM -----------------
 class ActivityItem extends StatelessWidget {
   final IconData icon;
   final String title;

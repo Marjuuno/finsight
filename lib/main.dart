@@ -17,9 +17,19 @@ void main() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  // ⭐️ NEW: Optional parameter to override the onboarding check for testing
+  final bool? onboardingCompleteOverride;
 
+  const MyApp({super.key, this.onboardingCompleteOverride});
+
+  // Function to check onboarding status, prioritizing the override
   Future<bool> checkOnboarding() async {
+    // If the override is set, use it immediately
+    if (onboardingCompleteOverride != null) {
+      return onboardingCompleteOverride!;
+    }
+    
+    // Otherwise, check SharedPreferences (normal runtime behavior)
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool('onboarding_complete') ?? false;
   }
@@ -31,6 +41,7 @@ class MyApp extends StatelessWidget {
       title: 'FinSight',
       theme: ThemeData(primarySwatch: Colors.green),
       home: FutureBuilder<bool>(
+        // FutureBuilder calls the modified checkOnboarding function
         future: checkOnboarding(),
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
@@ -43,6 +54,7 @@ class MyApp extends StatelessWidget {
           bool onboardingComplete = snapshot.data ?? false;
 
           // Check if user is already logged in
+          // Note: In a real test, you'd need to mock FirebaseAuth
           User? currentUser = FirebaseAuth.instance.currentUser;
 
           if (!onboardingComplete) {
