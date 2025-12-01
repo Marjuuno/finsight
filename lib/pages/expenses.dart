@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // Add this package to your pubspec.yaml for date formatting
+import 'package:intl/intl.dart';
 
 // Assuming these pages exist and were imported in the context of the previous request
 import 'package:finsight/pages/settings.dart';
@@ -28,23 +28,31 @@ class ExpensesPage extends StatefulWidget {
 
 class _ExpensesPageState extends State<ExpensesPage> {
   bool _showAddMenu = false;
-  
+
   // ------------------- FIREBASE DATA STATE -------------------
   List<Map<String, dynamic>> _allExpenses = []; // Store all fetched expenses
-  List<Map<String, dynamic>> _filteredExpenses = []; // Store expenses for selected date
+  List<Map<String, dynamic>> _filteredExpenses =
+      []; // Store expenses for selected date
   bool isLoading = true;
   String? errorMessage;
   double _totalDayExpenses = 0.0;
-  
+
   // New state for Calendar Functionality
-  DateTime _selectedDate = DateTime.now().copyWith(hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0);
-  Map<String, double> _dailyExpensesMap = {}; // Key: 'YYYY-MM-DD', Value: total expense
+  DateTime _selectedDate = DateTime.now().copyWith(
+    hour: 0,
+    minute: 0,
+    second: 0,
+    millisecond: 0,
+    microsecond: 0,
+  );
+  Map<String, double> _dailyExpensesMap =
+      {}; // Key: 'YYYY-MM-DD', Value: total expense
   // -------------------------------------------------------------
 
   @override
   void initState() {
     super.initState();
-    _fetchExpenses(); 
+    _fetchExpenses();
   }
 
   void _toggleAddMenu() {
@@ -64,16 +72,24 @@ class _ExpensesPageState extends State<ExpensesPage> {
 
   // --- NEW: Function to filter expenses based on the selected date ---
   void _filterExpensesByDate() {
-    final String selectedDateString = DateFormat('yyyy-MM-dd').format(_selectedDate);
+    final String selectedDateString = DateFormat(
+      'yyyy-MM-dd',
+    ).format(_selectedDate);
 
-    _filteredExpenses = _allExpenses.where((expense) {
-      final expenseDate = expense['date'] as DateTime;
-      final expenseDateString = DateFormat('yyyy-MM-dd').format(expenseDate);
-      return expenseDateString == selectedDateString;
-    }).toList();
+    _filteredExpenses =
+        _allExpenses.where((expense) {
+          final expenseDate = expense['date'] as DateTime;
+          final expenseDateString = DateFormat(
+            'yyyy-MM-dd',
+          ).format(expenseDate);
+          return expenseDateString == selectedDateString;
+        }).toList();
 
     // Calculate total for the selected day
-    _totalDayExpenses = _filteredExpenses.fold(0.0, (sum, item) => sum + (item['amount'] as double));
+    _totalDayExpenses = _filteredExpenses.fold(
+      0.0,
+      (sum, item) => sum + (item['amount'] as double),
+    );
 
     setState(() {}); // Update the UI with filtered list and total
   }
@@ -97,44 +113,68 @@ class _ExpensesPageState extends State<ExpensesPage> {
         return;
       }
 
-      QuerySnapshot expensesSnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('expenses') 
-          .orderBy('date', descending: true) 
-          .get();
+      // CRITICAL FIX 1: Query the NESTED path: users/{uid}/transactions
+      // This path matches your defined security rules.
+      QuerySnapshot expensesSnapshot =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('transactions')
+              .where('type', isEqualTo: 'expense') // Only fetch expenses
+              .orderBy('timestamp', descending: true)
+              .get();
 
       List<Map<String, dynamic>> fetchedExpenses = [];
       Map<String, double> calculatedDailyExpenses = {};
 
       for (var doc in expensesSnapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
-        
-        // Safely extract amount and date
+
+        // 1. Safely extract amount
         double amount = 0.0;
         if (data.containsKey('amount')) {
-          if (data['amount'] is num) {
-            amount = data['amount'].toDouble();
-          } else if (data['amount'] is String) {
-            amount = double.tryParse(data['amount']) ?? 0.0;
+          // Use null-aware operator for safer casting
+          amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
+        }
+
+        // 2. Safely extract date
+        DateTime date = DateTime.now();
+        if (data.containsKey('timestamp') && data['timestamp'] is Timestamp) {
+          date = (data['timestamp'] as Timestamp).toDate();
+        } else if (data.containsKey('date')) {
+          // Fallback for manually entered date string
+          try {
+            final parts = (data['date'] as String).split('/');
+            if (parts.length == 3) {
+              date = DateTime(
+                int.parse(parts[2]),
+                int.parse(parts[0]),
+                int.parse(parts[1]),
+              );
+            }
+          } catch (_) {
+            // Use default date if parsing fails
           }
         }
-        
-        DateTime date = data['date'] != null
-            ? (data['date'] is Timestamp
-                ? (data['date'] as Timestamp).toDate()
-                : DateTime.tryParse(data['date'].toString()) ?? DateTime.now())
-            : DateTime.now();
 
         // Accumulate daily total for the map
         final dateKey = DateFormat('yyyy-MM-dd').format(date);
-        calculatedDailyExpenses[dateKey] = (calculatedDailyExpenses[dateKey] ?? 0.0) + amount;
-        
+        calculatedDailyExpenses[dateKey] =
+            (calculatedDailyExpenses[dateKey] ?? 0.0) + amount;
+
         fetchedExpenses.add({
           'category': data['category'] ?? 'Unknown',
           'amount': amount,
-          'user': data['userTag'] ?? 'Me', 
-          'date': date.copyWith(hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0), // Normalize date
+          // FIX 2: Safely extract walletName. Use as String? to accept null value.
+          'walletName': data['walletName'] as String?,
+          // ------------------------------------------------
+          'date': date.copyWith(
+            hour: 0,
+            minute: 0,
+            second: 0,
+            millisecond: 0,
+            microsecond: 0,
+          ), // Normalize date
         });
       }
 
@@ -145,33 +185,45 @@ class _ExpensesPageState extends State<ExpensesPage> {
       });
 
       // Filter and calculate total for the *currently selected* date after fetching all data
-      _filterExpensesByDate(); 
-
+      _filterExpensesByDate();
     } catch (e) {
       print('Error fetching expenses: $e');
       setState(() {
         isLoading = false;
-        errorMessage = 'Failed to load expenses.';
+        errorMessage = 'Failed to load expenses. Error: ${e.toString()}';
       });
     }
   }
 
-  // Utility to map category names to icons 
+  // Utility to map category names to icons
   IconData _getIconForCategory(String category) {
     switch (category.toLowerCase()) {
-      case 'health': return Icons.favorite_border;
-      case 'transport': return Icons.directions_car_filled_outlined;
-      case 'education': return Icons.school_outlined;
-      case 'subscription': return Icons.calendar_month_outlined;
-      case 'groceries': return Icons.shopping_basket_outlined;
-      case 'food': return Icons.fastfood_outlined;
-      case 'daily': return Icons.local_mall_outlined;
-      case 'bills': return Icons.receipt_long_outlined;
-      case 'house': return Icons.home_outlined;
-      case 'clothing': return Icons.checkroom_outlined;
-      case 'self-care': return Icons.spa_outlined;
-      case 'others': return Icons.devices_other_sharp;
-      default: return Icons.paste_outlined;
+      case 'health':
+        return Icons.favorite_border;
+      case 'transport':
+        return Icons.directions_car_filled_outlined;
+      case 'education':
+        return Icons.school_outlined;
+      case 'subscription':
+        return Icons.calendar_month_outlined;
+      case 'groceries':
+        return Icons.shopping_basket_outlined;
+      case 'food':
+        return Icons.fastfood_outlined;
+      case 'daily':
+        return Icons.local_mall_outlined;
+      case 'bills':
+        return Icons.receipt_long_outlined;
+      case 'house':
+        return Icons.home_outlined;
+      case 'clothing':
+        return Icons.checkroom_outlined;
+      case 'self-care':
+        return Icons.spa_outlined;
+      case 'others':
+        return Icons.devices_other_sharp;
+      default:
+        return Icons.paste_outlined;
     }
   }
 
@@ -198,34 +250,40 @@ class _ExpensesPageState extends State<ExpensesPage> {
                       selectedDate: _selectedDate,
                       dailyTotals: _dailyExpensesMap,
                       onDateSelected: _selectDate, // Pass the callback
-                      onMonthYearChanged: _fetchExpenses, // Fetch new data if month/year changes
+                      onMonthYearChanged:
+                          _fetchExpenses, // Fetch new data if month/year changes
                     ),
                   ),
 
                   // ----------------- EXPENSES LIST HEADER -----------------
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
                     color: _expensesBackgroundColor,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          DateFormat('EEE, MM/dd').format(_selectedDate), 
+                          DateFormat('EEE, MM/dd').format(_selectedDate),
                           style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: _primaryGreen),
+                            fontWeight: FontWeight.bold,
+                            color: _primaryGreen,
+                          ),
                         ),
                         Text(
-                          "Expenses: ₱${_totalDayExpenses.toStringAsFixed(2)}", 
+                          "Expenses: ₱${_totalDayExpenses.toStringAsFixed(2)}",
                           style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.red),
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  
+
                   // ----------------- DYNAMIC EXPENSES LIST ITEMS -----------------
                   Expanded(
                     child: RefreshIndicator(
@@ -237,12 +295,12 @@ class _ExpensesPageState extends State<ExpensesPage> {
                 ],
               ),
             ),
-            
+
             // 2. Pop-Up Menu Overlay
             if (_showAddMenu) _buildAddMenuOverlay(context),
           ],
         ),
-        
+
         // ----------------- CONSISTENT BOTTOM NAV BAR -----------------
         bottomNavigationBar: _buildBottomNavigationBar(context),
       ),
@@ -289,9 +347,11 @@ class _ExpensesPageState extends State<ExpensesPage> {
       itemBuilder: (context, index) {
         final expense = _filteredExpenses[index];
         return ExpenseItem(
-          icon: _getIconForCategory(expense['category']), 
+          icon: _getIconForCategory(expense['category']),
           title: expense['category'],
-          user: expense['user'],
+          // CRITICAL FIX 3: Pass the walletName (which is String? from _fetchExpenses)
+          walletName: expense['walletName'],
+          // --------------------------------------------
           amount: "-₱${expense['amount'].toStringAsFixed(2)}",
         );
       },
@@ -302,7 +362,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
 
   Widget _buildAddMenuOverlay(BuildContext context) {
     return Positioned(
-      bottom: 280, 
+      bottom: 280,
       left: 0,
       right: 0,
       child: Center(
@@ -310,7 +370,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
           width: 230,
           padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
           decoration: BoxDecoration(
-            color: Color(0xFF387E5A),
+            color: const Color(0xFF387E5A),
             borderRadius: BorderRadius.circular(25),
             boxShadow: [
               BoxShadow(
@@ -340,7 +400,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
         width: double.infinity,
         child: ElevatedButton(
           onPressed: () {
-            _toggleAddMenu(); 
+            _toggleAddMenu();
 
             Widget targetPage;
             if (text == 'Add Wallet') {
@@ -356,7 +416,9 @@ class _ExpensesPageState extends State<ExpensesPage> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => targetPage),
-            ).then((_) => _fetchExpenses()); // Refresh data when returning from add page
+            ).then(
+              (_) => _fetchExpenses(),
+            ); // Refresh data when returning from add page
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
@@ -389,21 +451,31 @@ class _ExpensesPageState extends State<ExpensesPage> {
           _navBarItem(context, Icons.home, const HomePage()),
           _navBarItem(context, Icons.groups_2, const SharedBudget()),
           InkWell(
-            onTap: _toggleAddMenu, 
+            onTap: _toggleAddMenu,
             child: const CircleAvatar(
               radius: 28,
               backgroundColor: _centerButtonColor,
               child: Icon(Icons.add, color: Colors.white, size: 34),
             ),
           ),
-          _navBarItem(context, Icons.credit_card_outlined, const ExpensesPage(), isCurrent: true), 
+          _navBarItem(
+            context,
+            Icons.credit_card_outlined,
+            const ExpensesPage(),
+            isCurrent: true,
+          ),
           _navBarItem(context, Icons.settings, const SettingsPage()),
         ],
       ),
     );
   }
 
-  Widget _navBarItem(BuildContext context, IconData icon, Widget targetPage, {bool isCurrent = false}) {
+  Widget _navBarItem(
+    BuildContext context,
+    IconData icon,
+    Widget targetPage, {
+    bool isCurrent = false,
+  }) {
     return InkWell(
       onTap: () {
         if (!isCurrent) {
@@ -416,14 +488,14 @@ class _ExpensesPageState extends State<ExpensesPage> {
       },
       child: Icon(
         icon,
-        color: isCurrent ? Colors.white : Colors.white70, 
+        color: isCurrent ? Colors.white : Colors.white70,
         size: 32,
       ),
     );
   }
 }
 
-// ----------------- CALENDAR WIDGET (UPDATED FOR INTERACTIVITY) -----------------
+// ----------------- CALENDAR WIDGET (Remains the same) -----------------
 class CalendarWidget extends StatefulWidget {
   final DateTime selectedDate;
   final Map<String, double> dailyTotals;
@@ -460,7 +532,7 @@ class _CalendarWidgetState extends State<CalendarWidget> {
   void didUpdateWidget(covariant CalendarWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Recalculate days if selected month changes
-    if (widget.selectedDate.month != oldWidget.selectedDate.month || 
+    if (widget.selectedDate.month != oldWidget.selectedDate.month ||
         widget.selectedDate.year != oldWidget.selectedDate.year) {
       _displayedMonth = widget.selectedDate.copyWith(day: 1);
       _calculateMonthDays();
@@ -490,24 +562,31 @@ class _CalendarWidgetState extends State<CalendarWidget> {
           maxExpense = value;
           maxKey = key;
         }
-        if (value < minExpense) {
+        // Check if the expense is greater than zero before considering it the 'least' expensive
+        if (value > 0 && value < minExpense) {
           minExpense = value;
           minKey = key;
         }
       }
     });
 
+    // If the minExpense found is 0, we treat it as no expense day being the 'least expensive' among spending days
     _mostExpensiveDayKey = maxExpense > 0 ? maxKey : '';
-    _leastExpensiveDayKey = minExpense != double.maxFinite ? minKey : '';
+    _leastExpensiveDayKey =
+        minExpense != double.maxFinite && minExpense > 0 ? minKey : '';
   }
 
   // Utility to generate a list of days for the currently displayed month
   void _calculateMonthDays() {
     final firstDayOfMonth = _displayedMonth;
-    final lastDayOfMonth = DateTime(firstDayOfMonth.year, firstDayOfMonth.month + 1, 0);
+    final lastDayOfMonth = DateTime(
+      firstDayOfMonth.year,
+      firstDayOfMonth.month + 1,
+      0,
+    );
 
     // Get the weekday of the first day (Monday=1, Sunday=7). Calendar starts on Sunday (index 0).
-    int firstWeekday = firstDayOfMonth.weekday % 7; 
+    int firstWeekday = firstDayOfMonth.weekday % 7;
 
     List<DateTime> days = [];
 
@@ -530,11 +609,15 @@ class _CalendarWidgetState extends State<CalendarWidget> {
     }
     _monthDays = days;
   }
-  
+
   // Handlers for month/year navigation
   void _goToPreviousMonth() {
     setState(() {
-      _displayedMonth = DateTime(_displayedMonth.year, _displayedMonth.month - 1, 1);
+      _displayedMonth = DateTime(
+        _displayedMonth.year,
+        _displayedMonth.month - 1,
+        1,
+      );
       _calculateMonthDays();
       widget.onMonthYearChanged(); // Trigger data fetch for new month
     });
@@ -542,7 +625,11 @@ class _CalendarWidgetState extends State<CalendarWidget> {
 
   void _goToNextMonth() {
     setState(() {
-      _displayedMonth = DateTime(_displayedMonth.year, _displayedMonth.month + 1, 1);
+      _displayedMonth = DateTime(
+        _displayedMonth.year,
+        _displayedMonth.month + 1,
+        1,
+      );
       _calculateMonthDays();
       widget.onMonthYearChanged(); // Trigger data fetch for new month
     });
@@ -555,9 +642,7 @@ class _CalendarWidgetState extends State<CalendarWidget> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          const BoxShadow(color: Colors.black12, blurRadius: 10),
-        ],
+        boxShadow: [const BoxShadow(color: Colors.black12, blurRadius: 10)],
       ),
       child: Column(
         children: [
@@ -570,14 +655,20 @@ class _CalendarWidgetState extends State<CalendarWidget> {
               ),
               Row(
                 children: [
-                  _buildDropdown(DateFormat.MMM().format(_displayedMonth), 
-                    [DateFormat.MMM().format(_displayedMonth)], 
-                    onChanged: (val) { /* Placeholder for real dropdown */ },
+                  _buildDropdown(
+                    DateFormat.MMM().format(_displayedMonth),
+                    [DateFormat.MMM().format(_displayedMonth)],
+                    onChanged: (val) {
+                      /* Placeholder for real dropdown */
+                    },
                   ),
                   const SizedBox(width: 8),
-                  _buildDropdown(DateFormat.y().format(_displayedMonth), 
-                    [DateFormat.y().format(_displayedMonth)], 
-                    onChanged: (val) { /* Placeholder for real dropdown */ },
+                  _buildDropdown(
+                    DateFormat.y().format(_displayedMonth),
+                    [DateFormat.y().format(_displayedMonth)],
+                    onChanged: (val) {
+                      /* Placeholder for real dropdown */
+                    },
                   ),
                 ],
               ),
@@ -591,13 +682,55 @@ class _CalendarWidgetState extends State<CalendarWidget> {
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              Text('Su', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-              Text('Mo', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-              Text('Tu', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-              Text('We', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-              Text('Th', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-              Text('Fr', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-              Text('Sa', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+              Text(
+                'Su',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              Text(
+                'Mo',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              Text(
+                'Tu',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              Text(
+                'We',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              Text(
+                'Th',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              Text(
+                'Fr',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              Text(
+                'Sa',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -611,33 +744,56 @@ class _CalendarWidgetState extends State<CalendarWidget> {
               mainAxisSpacing: 8,
               crossAxisSpacing: 8,
             ),
-            itemCount: _monthDays.length, 
+            itemCount: _monthDays.length,
             itemBuilder: (context, index) {
               final dayDate = _monthDays[index];
-              final bool isCurrentMonth = dayDate.month == _displayedMonth.month;
-              final bool isSelected = DateFormat('yyyy-MM-dd').format(dayDate) == DateFormat('yyyy-MM-dd').format(widget.selectedDate);
+              final bool isCurrentMonth =
+                  dayDate.month == _displayedMonth.month;
+              final bool isSelected =
+                  DateFormat('yyyy-MM-dd').format(dayDate) ==
+                  DateFormat('yyyy-MM-dd').format(widget.selectedDate);
               final String dateKey = DateFormat('yyyy-MM-dd').format(dayDate);
-              final bool hasExpense = widget.dailyTotals.containsKey(dateKey) && widget.dailyTotals[dateKey]! > 0;
-              final bool isMostExpensive = dateKey == _mostExpensiveDayKey && hasExpense;
-              final bool isLeastExpensive = dateKey == _leastExpensiveDayKey && hasExpense;
+              final bool hasExpense =
+                  widget.dailyTotals.containsKey(dateKey) &&
+                  widget.dailyTotals[dateKey]! > 0;
+              final bool isMostExpensive =
+                  dateKey == _mostExpensiveDayKey && hasExpense;
+              final bool isLeastExpensive =
+                  dateKey == _leastExpensiveDayKey && hasExpense;
 
-              Color dayTextColor = isCurrentMonth ? _primaryGreen : Colors.grey.shade400;
+              Color dayTextColor =
+                  isCurrentMonth ? _primaryGreen : Colors.grey.shade400;
               if (isSelected) {
                 dayTextColor = Colors.white;
               } else if (isMostExpensive) {
-                 dayTextColor = Colors.red.shade800; // Most expensive day highlight
+                dayTextColor =
+                    Colors.red.shade800; // Most expensive day highlight
               } else if (isLeastExpensive) {
-                 dayTextColor = _primaryGreen; // Least expensive day highlight
+                dayTextColor = _primaryGreen; // Least expensive day highlight
               }
 
               return InkWell(
-                onTap: isCurrentMonth ? () => widget.onDateSelected(dayDate.copyWith(hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0)) : null,
+                onTap:
+                    isCurrentMonth
+                        ? () => widget.onDateSelected(
+                          dayDate.copyWith(
+                            hour: 0,
+                            minute: 0,
+                            second: 0,
+                            millisecond: 0,
+                            microsecond: 0,
+                          ),
+                        )
+                        : null,
                 child: Container(
                   decoration: BoxDecoration(
                     color: isSelected ? _primaryGreen : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: isMostExpensive && !isSelected ? Colors.red.shade300 : Colors.transparent,
+                      color:
+                          isMostExpensive && !isSelected
+                              ? Colors.red.shade300
+                              : Colors.transparent,
                       width: isMostExpensive && !isSelected ? 1.5 : 0,
                     ),
                   ),
@@ -647,11 +803,15 @@ class _CalendarWidgetState extends State<CalendarWidget> {
                       Text(
                         dayDate.day.toString(),
                         style: TextStyle(
-                          fontWeight: isSelected || hasExpense ? FontWeight.bold : FontWeight.normal,
+                          fontWeight:
+                              isSelected || hasExpense
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                           color: dayTextColor,
                         ),
                       ),
-                      if (hasExpense && !isSelected) // Show a dot for days with expenses
+                      if (hasExpense &&
+                          !isSelected) // Show a dot for days with expenses
                         Container(
                           margin: const EdgeInsets.only(top: 2),
                           width: 5,
@@ -672,7 +832,11 @@ class _CalendarWidgetState extends State<CalendarWidget> {
     );
   }
 
-  Widget _buildDropdown(String value, List<String> items, {required Function(String?) onChanged}) {
+  Widget _buildDropdown(
+    String value,
+    List<String> items, {
+    required Function(String?) onChanged,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -683,12 +847,19 @@ class _CalendarWidgetState extends State<CalendarWidget> {
         child: DropdownButton<String>(
           value: value,
           icon: const Icon(Icons.arrow_drop_down, color: _primaryGreen),
-          items: items.map<DropdownMenuItem<String>>((String item) {
-            return DropdownMenuItem<String>(
-              value: item,
-              child: Text(item, style: const TextStyle(fontWeight: FontWeight.bold, color: _primaryGreen)),
-            );
-          }).toList(),
+          items:
+              items.map<DropdownMenuItem<String>>((String item) {
+                return DropdownMenuItem<String>(
+                  value: item,
+                  child: Text(
+                    item,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: _primaryGreen,
+                    ),
+                  ),
+                );
+              }).toList(),
           onChanged: onChanged,
         ),
       ),
@@ -696,18 +867,19 @@ class _CalendarWidgetState extends State<CalendarWidget> {
   }
 }
 
-// ----------------- EXPENSE ITEM WIDGET (Remains the same) -----------------
+// ----------------- EXPENSE ITEM WIDGET (UPDATED) -----------------
 class ExpenseItem extends StatelessWidget {
   final IconData icon;
   final String title;
-  final String user;
+  // CRITICAL FIX 4: Use String? (Nullable String) for walletName
+  final String? walletName;
   final String amount;
 
   const ExpenseItem({
     super.key,
     required this.icon,
     required this.title,
-    required this.user,
+    required this.walletName, // Updated parameter name
     required this.amount,
   });
 
@@ -726,10 +898,14 @@ class ExpenseItem extends StatelessWidget {
                 Text(
                   title,
                   style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w500, color: _primaryGreen),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: _primaryGreen,
+                  ),
                 ),
                 Text(
-                  user,
+                  // CRITICAL FIX 5: Use null-coalescing operator (??) to display a default if walletName is null
+                  walletName ?? 'Wallet Deleted/N/A',
                   style: const TextStyle(fontSize: 14, color: Colors.grey),
                 ),
               ],
@@ -738,7 +914,10 @@ class ExpenseItem extends StatelessWidget {
           Text(
             amount,
             style: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red),
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.red,
+            ),
           ),
         ],
       ),

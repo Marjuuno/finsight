@@ -273,7 +273,7 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             StatusItem(
                                 icon: Icons.wallet,
-                                label: "Spending",
+                                label: "Expenses",
                                 amount: "-₱${totalSpending.toStringAsFixed(2)}",
                                 color: Colors.red),
                             StatusItem(

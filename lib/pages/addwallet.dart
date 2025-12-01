@@ -11,60 +11,121 @@ class AddWalletPage extends StatefulWidget {
 }
 
 class _AddWalletPageState extends State<AddWalletPage> {
+  // 1. Text Controllers
   final TextEditingController nameController = TextEditingController();
   final TextEditingController balanceController = TextEditingController();
+
+  // 2. Firebase Instances (Correctly initialized)
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void dispose() {
+    // 3. Proper disposal of controllers (Correct)
     nameController.dispose();
     balanceController.dispose();
     super.dispose();
   }
 
   Future<void> _addWallet() async {
-    String name = nameController.text.trim();
-    String balanceText = balanceController.text.trim();
+    final String name = nameController.text.trim();
+    final String balanceText = balanceController.text.trim();
+    final User? user = _auth.currentUser;
 
+    // --- Authentication Check ---
+    if (user == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You must be logged in to create a wallet.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // --- Input Validation ---
     if (name.isEmpty || balanceText.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter both wallet name and balance'),
+          content: Text('Please enter a wallet name and initial amount.'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
-    double? balance = double.tryParse(balanceText);
-    if (balance == null) {
+    // Attempt to parse balance and validate it's non-negative
+    final double? balance = double.tryParse(balanceText);
+    if (balance == null || balance < 0) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Balance must be a valid number'),
+          content: Text('Initial amount must be a valid non-negative number.'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
+
+    // --- 🔑 DUPLICATION CHECK ADDED HERE ---
+    try {
+      // Query the user's wallets subcollection for a document where 'name' equals the input name
+      final querySnapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('wallets')
+          .where('name', isEqualTo: name)
+          .limit(1) // We only need to find one match to confirm duplication
+          .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        // A wallet with this name already exists
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Wallet name "$name" already exists. Please choose a different name.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return; // Stop the function execution
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error checking for duplicate wallet name.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      // Optional: Log the error
+      // print("Duplication check error: $e");
+      return;
+    }
+    // --- 🔑 END DUPLICATION CHECK ---
+
+    // Use a loading state or context check before proceeding
+    if (!mounted) return;
 
     try {
-      final User? user = _auth.currentUser;
-      if (user == null) throw Exception("User not logged in");
-
+      // --- 4. Firestore Write Operation ---
+      // Adds a new document to the user's dedicated 'wallets' subcollection with a random ID.
       await _firestore
           .collection('users')
           .doc(user.uid)
           .collection('wallets')
           .add({
         'name': name,
-        'balance': balance,
+        'balance': balance, // This is the initial balance of the wallet
         'created_at': FieldValue.serverTimestamp(),
       });
 
+      // After successful write, show success message and navigate
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Wallet "$name" added with ₱$balance'),
+          content: Text('Wallet "$name" successfully created with ₱${balance.toStringAsFixed(2)}.'),
           backgroundColor: Colors.green,
         ),
       );
@@ -76,12 +137,18 @@ class _AddWalletPageState extends State<AddWalletPage> {
         (route) => false,
       );
     } catch (e) {
+      // --- Error Handling ---
+      if (!mounted) return;
+      String errorMessage = 'Failed to add wallet. Please check your network or permissions.';
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error adding wallet: $e'),
+          content: Text(errorMessage),
           backgroundColor: Colors.red,
         ),
       );
+      // Optional: print the full error to the console for debugging
+      // print("Firestore Error during creation: $e");
     }
   }
 
@@ -106,7 +173,7 @@ class _AddWalletPageState extends State<AddWalletPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Text(
-                'Add Wallet',
+                'Create New Wallet',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -114,13 +181,16 @@ class _AddWalletPageState extends State<AddWalletPage> {
                 ),
               ),
               const SizedBox(height: 30),
+              // 
+
+
               Image.asset(
                 'assets/images/logo/piggybank.png',
                 height: 200,
               ),
               const SizedBox(height: 30),
               const Text(
-                'Secure savings into a wallet.',
+                'Give your new wallet a name and starting amount.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
@@ -131,7 +201,7 @@ class _AddWalletPageState extends State<AddWalletPage> {
               TextField(
                 controller: nameController,
                 decoration: InputDecoration(
-                  hintText: 'Wallet Name',
+                  hintText: 'Wallet Name (e.g., Cash, Bank A, Savings)',
                   fillColor: Colors.white,
                   filled: true,
                   border: OutlineInputBorder(
@@ -147,7 +217,7 @@ class _AddWalletPageState extends State<AddWalletPage> {
                 controller: balanceController,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  hintText: 'Initial Balance',
+                  hintText: 'Initial Balance (₱)',
                   fillColor: Colors.white,
                   filled: true,
                   border: OutlineInputBorder(
@@ -194,7 +264,7 @@ class _AddWalletPageState extends State<AddWalletPage> {
                         padding: const EdgeInsets.symmetric(vertical: 15),
                       ),
                       child: const Text(
-                        'Add',
+                        'Create Wallet',
                         style: TextStyle(fontSize: 16),
                       ),
                     ),
