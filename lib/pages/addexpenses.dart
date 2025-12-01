@@ -23,11 +23,11 @@ class _AddExpensePageState extends State<AddExpensePage> {
     {'name': 'Groceries', 'icon': Icons.shopping_basket_outlined},
     {'name': 'Food', 'icon': Icons.fastfood_outlined},
     {'name': 'Daily', 'icon': Icons.local_mall_outlined},
-    {'name': 'Interest', 'icon': Icons.movie_outlined},
+    {'name': 'Bills', 'icon': Icons.receipt_long_outlined},
     {'name': 'House', 'icon': Icons.home_outlined},
     {'name': 'Clothing', 'icon': Icons.checkroom_outlined},
     {'name': 'Self-Care', 'icon': Icons.spa_outlined},
-    {'name': 'Bills', 'icon': Icons.receipt_long_outlined},
+    {'name': 'Others', 'icon': Icons.grid_view_rounded},
   ];
 
   // --- State Variables and Controllers ---

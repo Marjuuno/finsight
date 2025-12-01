@@ -160,18 +160,18 @@ class _ExpensesPageState extends State<ExpensesPage> {
   IconData _getIconForCategory(String category) {
     switch (category.toLowerCase()) {
       case 'health': return Icons.favorite_border;
-      case 'transportation': return Icons.directions_car_filled_outlined;
+      case 'transport': return Icons.directions_car_filled_outlined;
       case 'education': return Icons.school_outlined;
       case 'subscription': return Icons.calendar_month_outlined;
       case 'groceries': return Icons.shopping_basket_outlined;
       case 'food': return Icons.fastfood_outlined;
       case 'daily': return Icons.local_mall_outlined;
-      case 'entertainment': return Icons.movie_outlined;
+      case 'bills': return Icons.receipt_long_outlined;
       case 'house': return Icons.home_outlined;
       case 'clothing': return Icons.checkroom_outlined;
       case 'self-care': return Icons.spa_outlined;
-      case 'bills': return Icons.receipt_long_outlined;
-      default: return Icons.receipt_long_outlined;
+      case 'others': return Icons.devices_other_sharp;
+      default: return Icons.paste_outlined;
     }
   }
 

@@ -10,9 +10,7 @@ import 'settings.dart';
 import 'sharedbudget.dart';
 
 // Theme colors
-const Color _accentGreen = Color(0xFF94A780);
 const Color _centerButtonColor = Colors.orange;
-const Color _popUpGreen = Color(0xFF558B6E);
 const Color _primaryGreen = Color(0xFF0D532E);
 const Color _activityCardColor = Color(0xFFF5F5F5); // Background for the Scaffold
 const Color _cardWhite = Colors.white; // Background for the activity list
@@ -153,21 +151,19 @@ class _HomePageState extends State<HomePage> {
 
   IconData _getIconForCategory(String category) {
     switch (category.toLowerCase()) {
-      case 'home': return Icons.home_outlined;
-      case 'transportation': return Icons.directions_car_filled_outlined;
-      case 'education': return Icons.school_outlined;
-      case 'groceries': return Icons.shopping_basket_outlined;
-      case 'food and drinks':
-      case 'food': return Icons.fastfood_outlined; 
-      case 'daily': return Icons.local_mall_outlined;
-      case 'entertainment': return Icons.movie_outlined;
-      case 'clothing': return Icons.checkroom_outlined;
-      case 'personal care':
-      case 'self-care': return Icons.spa_outlined;
-      case 'bills':
-      case 'subscription': return Icons.receipt_long_outlined;
       case 'health': return Icons.favorite_border;
-      default: return Icons.receipt_long_outlined;
+      case 'transport': return Icons.directions_car_filled_outlined;
+      case 'education': return Icons.school_outlined;
+      case 'subscription': return Icons.calendar_month_outlined;
+      case 'groceries': return Icons.shopping_basket_outlined;
+      case 'food': return Icons.fastfood_outlined;
+      case 'daily': return Icons.local_mall_outlined;
+      case 'bills': return Icons.receipt_long_outlined;
+      case 'house': return Icons.home_outlined;
+      case 'clothing': return Icons.checkroom_outlined;
+      case 'self-care': return Icons.spa_outlined;
+      case 'others': return Icons.devices_other_sharp;
+      default: return Icons.paste_outlined;
     }
   }
 
@@ -216,7 +212,7 @@ class _HomePageState extends State<HomePage> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
-                          boxShadow: const [BoxShadow(color: Color.fromARGB(161, 0, 0, 0), blurRadius: 10)],
+                          boxShadow: const [BoxShadow(color: Color.fromARGB(93, 0, 0, 0), blurRadius: 10)],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.center,
