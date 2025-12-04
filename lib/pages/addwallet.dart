@@ -11,17 +11,14 @@ class AddWalletPage extends StatefulWidget {
 }
 
 class _AddWalletPageState extends State<AddWalletPage> {
-  // 1. Text Controllers
   final TextEditingController nameController = TextEditingController();
   final TextEditingController balanceController = TextEditingController();
 
-  // 2. Firebase Instances (Correctly initialized)
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void dispose() {
-    // 3. Proper disposal of controllers (Correct)
     nameController.dispose();
     balanceController.dispose();
     super.dispose();
@@ -32,7 +29,6 @@ class _AddWalletPageState extends State<AddWalletPage> {
     final String balanceText = balanceController.text.trim();
     final User? user = _auth.currentUser;
 
-    // --- Authentication Check ---
     if (user == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -44,7 +40,6 @@ class _AddWalletPageState extends State<AddWalletPage> {
       return;
     }
 
-    // --- Input Validation ---
     if (name.isEmpty || balanceText.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -56,7 +51,6 @@ class _AddWalletPageState extends State<AddWalletPage> {
       return;
     }
 
-    // Attempt to parse balance and validate it's non-negative
     final double? balance = double.tryParse(balanceText);
     if (balance == null || balance < 0) {
       if (!mounted) return;
@@ -69,27 +63,28 @@ class _AddWalletPageState extends State<AddWalletPage> {
       return;
     }
 
-    // --- 🔑 DUPLICATION CHECK ADDED HERE ---
+    // DUPLICATION CHECK — using walletName (canonical)
     try {
-      // Query the user's wallets subcollection for a document where 'name' equals the input name
-      final querySnapshot = await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('wallets')
-          .where('name', isEqualTo: name)
-          .limit(1) // We only need to find one match to confirm duplication
-          .get();
+      final querySnapshot =
+          await _firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('wallets')
+              .where('walletName', isEqualTo: name)
+              .limit(1)
+              .get();
 
       if (querySnapshot.docs.isNotEmpty) {
-        // A wallet with this name already exists
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Wallet name "$name" already exists. Please choose a different name.'),
+            content: Text(
+              'Wallet name "$name" already exists. Please choose a different name.',
+            ),
             backgroundColor: Colors.orange,
           ),
         );
-        return; // Stop the function execution
+        return;
       }
     } catch (e) {
       if (!mounted) return;
@@ -99,61 +94,55 @@ class _AddWalletPageState extends State<AddWalletPage> {
           backgroundColor: Colors.red,
         ),
       );
-      // Optional: Log the error
-      // print("Duplication check error: $e");
       return;
     }
-    // --- 🔑 END DUPLICATION CHECK ---
 
-    // Use a loading state or context check before proceeding
     if (!mounted) return;
 
     try {
-      // --- 4. Firestore Write Operation ---
-      // Adds a new document to the user's dedicated 'wallets' subcollection with a random ID.
-      await _firestore
+      // Write walletName (canonical) instead of "name"
+      await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('wallets')
           .add({
-        'name': name,
-        'balance': balance, // This is the initial balance of the wallet
-        'created_at': FieldValue.serverTimestamp(),
-      });
+            'walletName': name, // ✅ correct field + correct variable
+            'balance': balance, // current balance (will change)
+            'initialAmount': balance, // 🔥 fixed — used for total income
+            'created_at': FieldValue.serverTimestamp(),
+          });
 
-      // After successful write, show success message and navigate
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Wallet "$name" successfully created with ₱${balance.toStringAsFixed(2)}.'),
+          content: Text(
+            'Wallet "$name" successfully created with ₱${balance.toStringAsFixed(2)}.',
+          ),
           backgroundColor: Colors.green,
         ),
       );
 
-      // Navigate to HomePage and remove AddWalletPage from stack
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
         (route) => false,
       );
     } catch (e) {
-      // --- Error Handling ---
       if (!mounted) return;
-      String errorMessage = 'Failed to add wallet. Please check your network or permissions.';
-      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
+        const SnackBar(
+          content: Text(
+            'Failed to add wallet. Please check your network or permissions.',
+          ),
           backgroundColor: Colors.red,
         ),
       );
-      // Optional: print the full error to the console for debugging
-      // print("Firestore Error during creation: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // (unchanged UI — use your existing UI markup)
     return Scaffold(
       backgroundColor: const Color(0xFFC9DDB9),
       appBar: AppBar(
@@ -161,9 +150,7 @@ class _AddWalletPageState extends State<AddWalletPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       body: Center(
@@ -181,21 +168,12 @@ class _AddWalletPageState extends State<AddWalletPage> {
                 ),
               ),
               const SizedBox(height: 30),
-              // 
-
-
-              Image.asset(
-                'assets/images/logo/piggybank.png',
-                height: 200,
-              ),
+              Image.asset('assets/images/logo/piggybank.png', height: 200),
               const SizedBox(height: 30),
               const Text(
                 'Give your new wallet a name and starting amount.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF558B6E),
-                ),
+                style: TextStyle(fontSize: 16, color: Color(0xFF558B6E)),
               ),
               const SizedBox(height: 30),
               TextField(
@@ -208,8 +186,10 @@ class _AddWalletPageState extends State<AddWalletPage> {
                     borderRadius: BorderRadius.circular(15),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 15,
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -224,19 +204,18 @@ class _AddWalletPageState extends State<AddWalletPage> {
                     borderRadius: BorderRadius.circular(15),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 15,
+                  ),
                 ),
               ),
               const SizedBox(height: 40),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
+                      onPressed: () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF558B6E),
                         side: const BorderSide(color: Color(0xFF558B6E)),
