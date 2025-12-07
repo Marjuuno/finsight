@@ -1,21 +1,16 @@
-import 'package:finsight/pages/addexpenses.dart';
-import 'package:finsight/pages/adduser.dart';
-import 'package:finsight/pages/addwallet.dart';
-import 'package:finsight/pages/expenses.dart';
-import 'package:finsight/pages/settings.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:finsight/pages/homepage.dart';
-// Note: We keep the import for the current page (SharedBudget) as it may be navigated to from other pages.
-// import 'package:finsight/pages/sharedbudget.dart'; 
 
+import 'homepage.dart';
+import 'addwallet.dart';
+import 'adduser.dart';
+import 'addexpenses.dart';
+import 'expenses.dart';
+import 'settings.dart';
 
-// Theme colors (redefined for completeness)
-const Color _accentGreen = Color(0xFF94A780);
 const Color _centerButtonColor = Colors.orange;
-const Color _popUpGreen = Color(0xFF558B6E); 
 
-
-// Convert to StatefulWidget to manage the pop-up state
 class SharedBudget extends StatefulWidget {
   const SharedBudget({super.key});
 
@@ -24,38 +19,29 @@ class SharedBudget extends StatefulWidget {
 }
 
 class _SharedBudgetState extends State<SharedBudget> {
-  // State variable to control the visibility of the pop-up menu
   bool _showAddMenu = false;
 
   void _toggleAddMenu() {
-    setState(() {
-      _showAddMenu = !_showAddMenu;
-    });
+    if (!mounted) return;
+    setState(() => _showAddMenu = !_showAddMenu);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Wrap the entire screen in a GestureDetector to close the menu when tapping anywhere outside
     return GestureDetector(
       onTap: () {
-        if (_showAddMenu) {
-          _toggleAddMenu();
-        }
+        if (_showAddMenu) _toggleAddMenu();
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF7F7F7),
-
-        // Use Stack to layer the main content and the pop-up menu
         body: Stack(
           children: [
-            // 1. Main Content Area
             SafeArea(
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ---------------- TOP BAR ----------------
-                    // Header Row
+                    // TOP HEADER
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 20,
@@ -63,34 +49,96 @@ class _SharedBudgetState extends State<SharedBudget> {
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const SizedBox(width: 40),
-                          const Text(
-                            "SHARED  BUDGET",
+                        children: const [
+                          SizedBox(width: 40),
+                          Text(
+                            "SHARED  BUDGET",
                             style: TextStyle(
                               fontSize: 26,
                               fontWeight: FontWeight.bold,
                               color: Color(0xFFC79205),
                             ),
                           ),
-                          const Icon(Icons.notifications_none, size: 28),
+                          Icon(Icons.notifications_none, size: 28),
                         ],
                       ),
                     ),
 
                     const SizedBox(height: 20),
 
-                    // ---------------- BUDGET CARDS ----------------
+                    // FETCH GROUPS
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Column(
-                        children: const [
-                          SharedBudgetCard(),
-                          SizedBox(height: 20),
-                          SharedBudgetCard(),
-                          SizedBox(height: 20),
-                          SharedBudgetCard(),
-                        ],
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream:
+                            FirebaseFirestore.instance
+                                .collection("groups")
+                                .where(
+                                  "membersEmails",
+                                  arrayContains:
+                                      FirebaseAuth.instance.currentUser!.email,
+                                )
+                                .snapshots(),
+
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return const Padding(
+                              padding: EdgeInsets.all(40),
+                              child: Center(child: CircularProgressIndicator()),
+                            );
+                          }
+
+                          if (snapshot.data!.docs.isEmpty) {
+                            return const Padding(
+                              padding: EdgeInsets.all(40),
+                              child: Center(
+                                child: Text(
+                                  "No Groups Found",
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+
+                          return Column(
+                            children:
+                                snapshot.data!.docs.map((doc) {
+                                  final data =
+                                      doc.data() as Map<String, dynamic>;
+
+                                  final String groupName =
+                                      data["name"] ?? "Unnamed Group";
+                                  final double budget =
+                                      (data["initialBudget"] ?? 0).toDouble();
+                                  final List members = data["members"] ?? [];
+
+                                  final admin = members.firstWhere(
+                                    (m) => m["role"] == "Admin",
+                                    orElse: () => {"email": "Unknown"},
+                                  );
+
+                                  final String adminEmail = admin["email"];
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: 20,
+                                    ), // <--- ADD SPACING HERE
+                                    child: SharedBudgetCard(
+                                      groupId: doc.id,
+                                      groupName: groupName,
+                                      budget: budget,
+                                      members:
+                                          members
+                                              .map((m) => m["email"])
+                                              .toList(),
+                                    ),
+                                  );
+                                }).toList(),
+                          );
+                        },
                       ),
                     ),
 
@@ -100,37 +148,32 @@ class _SharedBudgetState extends State<SharedBudget> {
               ),
             ),
 
-            // 2. Pop-Up Menu Overlay (only visible when _showAddMenu is true)
+            // ADD MENU OVERLAY
             if (_showAddMenu) _buildAddMenuOverlay(context),
           ],
         ),
-        // ---------------- BOTTOM NAV BAR ----------------
         bottomNavigationBar: _buildBottomNavigationBar(context),
       ),
     );
   }
 
-  // --- Start of Reused Pop-Up Logic ---
-
-  /// Pop-Up Menu Widget, positioned above the Navigation Bar
+  // ADD POPUP MENU
   Widget _buildAddMenuOverlay(BuildContext context) {
-    // The Positioned widget places the menu in the Stack
     return Positioned(
-      // 70 (NavBar height) + ~30 (margin/padding) = 100
-      bottom: 191, 
+      bottom: 185,
       left: 0,
       right: 0,
       child: Center(
         child: Container(
-          width: 230, // Adjust width to fit the pop-up look
-          padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
+          width: 230,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
           decoration: BoxDecoration(
-            color: Color(0xFF387E5A),
+            color: const Color(0xFF387E5A),
             borderRadius: BorderRadius.circular(25),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 15,
+                color: Colors.black.withOpacity(0.35),
+                blurRadius: 18,
                 offset: const Offset(0, 5),
               ),
             ],
@@ -138,9 +181,9 @@ class _SharedBudgetState extends State<SharedBudget> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildPopUpButton('Add Wallet'),
-              _buildPopUpButton('Add User'),
-              _buildPopUpButton('Add Expenses'),
+              _popupButton('Add Wallet', const AddWalletPage()),
+              _popupButton('Add User', const AddGroupPage()),
+              _popupButton('Add Expenses', const AddExpensePage()),
             ],
           ),
         ),
@@ -148,33 +191,15 @@ class _SharedBudgetState extends State<SharedBudget> {
     );
   }
 
-  /// Helper for the white buttons inside the pop-up menu
-  Widget _buildPopUpButton(String text) {
+  Widget _popupButton(String text, Widget page) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5.0),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton(
           onPressed: () {
-            _toggleAddMenu(); // Close the menu regardless of the action
-
-            // Handle navigation based on the button text
-            if (text == 'Add Wallet') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AddWalletPage()),
-              );
-            } else if (text == 'Add User') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AddUserPage()),
-              );
-            } else if (text == 'Add Expenses') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AddExpensePage()),
-              );
-            }
+            _toggleAddMenu();
+            Navigator.push(context, MaterialPageRoute(builder: (_) => page));
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
@@ -183,7 +208,6 @@ class _SharedBudgetState extends State<SharedBudget> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(15),
             ),
-            elevation: 1,
           ),
           child: Text(
             text,
@@ -194,10 +218,7 @@ class _SharedBudgetState extends State<SharedBudget> {
     );
   }
 
-  // --- End of Reused Pop-Up Logic ---
-
-
-  // Same bottom nav bar implementation used across all pages for consistency
+  // BOTTOM NAV BAR
   Widget _buildBottomNavigationBar(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
@@ -208,11 +229,10 @@ class _SharedBudgetState extends State<SharedBudget> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _navBarItem(context, Icons.home, const HomePage()),
-          _navBarItem(context, Icons.groups_2, const SharedBudget(), isCurrent: true),
-          
-          // The ADD button now uses the toggle function
-          InkWell( 
+          _navItem(context, Icons.home, const HomePage()),
+          _navItem(context, Icons.groups_2, null, isCurrent: true),
+
+          InkWell(
             onTap: _toggleAddMenu,
             child: const CircleAvatar(
               radius: 28,
@@ -220,39 +240,51 @@ class _SharedBudgetState extends State<SharedBudget> {
               child: Icon(Icons.add, color: Colors.white, size: 34),
             ),
           ),
-          
-          _navBarItem(context, Icons.credit_card_outlined, const ExpensesPage()), 
-          _navBarItem(context, Icons.settings, const SettingsPage()),
+          _navItem(context, Icons.credit_card_outlined, const ExpensesPage()),
+          _navItem(context, Icons.settings, const SettingsPage()),
         ],
       ),
     );
   }
 
-  Widget _navBarItem(BuildContext context, IconData icon, Widget targetPage, {bool isCurrent = false}) {
+  Widget _navItem(
+    BuildContext context,
+    IconData icon,
+    Widget? page, {
+    bool isCurrent = false,
+  }) {
     return InkWell(
       onTap: () {
-        // Use pushReplacement to prevent building up a huge navigation stack for main tabs
-        if (!isCurrent) {
+        if (!isCurrent && page != null) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => targetPage),
+            MaterialPageRoute(builder: (_) => page),
           );
         }
       },
       child: Icon(
         icon,
-        color: isCurrent ? Colors.white : Colors.white70, 
+        color: isCurrent ? Colors.white : Colors.white70,
         size: 32,
       ),
     );
   }
 }
 
-//
-// ---------------- SHARED BUDGET CARD (Remains the same) ----------------
-//
+// SHARED BUDGET CARD
 class SharedBudgetCard extends StatelessWidget {
-  const SharedBudgetCard({super.key});
+  final String groupId;
+  final String groupName;
+  final double budget;
+  final List members;
+
+  const SharedBudgetCard({
+    super.key,
+    required this.groupId,
+    required this.groupName,
+    required this.budget,
+    required this.members,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -266,15 +298,17 @@ class SharedBudgetCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Row: Name + View Button
+          // TOP ROW
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                "Kevin Vega",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                groupName,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 18,
@@ -295,40 +329,38 @@ class SharedBudgetCard extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
-          // Budget Headers
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text("Total Budget", style: TextStyle(color: Colors.grey)),
-              Text("Spent Budget", style: TextStyle(color: Colors.grey)),
-              Text("Remaining Budget", style: TextStyle(color: Colors.grey)),
-            ],
-          ),
+          // BUDGET SUMMARY
+          Text("Total Budget: ₱$budget"),
+          const SizedBox(height: 4),
+          const Text("Spent: ₱0"),
+          const SizedBox(height: 4),
+          Text("Remaining: ₱$budget"),
 
           const SizedBox(height: 16),
 
-          // Avatars & Add User
+          // MEMBERS
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
-                children: [
-                  _avatar("assets/user1.png"),
-                  const SizedBox(width: 5),
-                  _avatar("assets/user2.png"),
-                  const SizedBox(width: 5),
-                  _avatar("assets/user3.png"),
-                  const SizedBox(width: 5),
-                  const Text(
-                    "+1",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ],
+                children:
+                    members.take(3).map((email) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 5),
+                        child: CircleAvatar(
+                          radius: 18,
+                          child: Text(
+                            email.substring(0, 1).toUpperCase(),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      );
+                    }).toList(),
               ),
 
-              // Add User button
+              // ADD USER BUTTON
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 18,
@@ -347,15 +379,6 @@ class SharedBudgetCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  // avatar widget
-  static Widget _avatar(String path) {
-    return CircleAvatar(
-      radius: 18,
-      backgroundColor: Colors.grey.shade200,
-      backgroundImage: AssetImage(path),
     );
   }
 }

@@ -46,12 +46,12 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
     if (_currentUser == null) return;
 
     // 1. Get Email from Firebase Auth (Read-only)
-    _emailController.text = _currentUser!.email ?? 'N/A';
+    _emailController.text = _currentUser.email ?? 'N/A';
     
     // 2. Fetch all profile data from Firestore
     try {
       DocumentSnapshot<Map<String, dynamic>> doc =
-          await FirebaseFirestore.instance.collection('users').doc(_currentUser!.uid).get();
+          await FirebaseFirestore.instance.collection('users').doc(_currentUser.uid).get();
 
       if (doc.exists && doc.data() != null) {
         Map<String, dynamic> data = doc.data()!;
@@ -65,7 +65,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
         _incomeController.text = data['income']?.toString() ?? '0'; 
       } else {
          // Fallback if the Firestore document doesn't exist
-        _nameController.text = _currentUser!.displayName ?? 'Name Not Found'; 
+        _nameController.text = _currentUser.displayName ?? 'Name Not Found'; 
       }
     } catch (e) {
       print("Error loading profile data: $e");
@@ -100,12 +100,12 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
 
     try {
       // 1. Update Name in Firebase Auth (optional, for convenience)
-      if (_currentUser!.displayName != newName) {
-        await _currentUser!.updateDisplayName(newName);
+      if (_currentUser.displayName != newName) {
+        await _currentUser.updateDisplayName(newName);
       }
       
       // 2. Update all fields in Firestore
-      await FirebaseFirestore.instance.collection('users').doc(_currentUser!.uid).set(
+      await FirebaseFirestore.instance.collection('users').doc(_currentUser.uid).set(
         {
           'name': newName,
           'phone': newContact,

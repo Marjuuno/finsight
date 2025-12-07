@@ -74,7 +74,7 @@ class _SettingsPageState extends State<SettingsPage> {
         target = const AddWalletPage();
         break;
       case 'Add User':
-        target = const AddUserPage();
+        target = const AddGroupPage();
         break;
       case 'Add Expenses':
         target = const AddExpensePage();

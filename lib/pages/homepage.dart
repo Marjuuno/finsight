@@ -524,7 +524,7 @@ class _HomePageState extends State<HomePage> {
             if (text == 'Add Wallet') {
               targetPage = const AddWalletPage();
             } else if (text == 'Add User') {
-              targetPage = const AddUserPage();
+              targetPage = const AddGroupPage();
             } else if (text == 'Add Expenses') {
               targetPage = const AddExpensePage();
             }
