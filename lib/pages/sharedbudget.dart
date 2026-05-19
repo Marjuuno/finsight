@@ -160,7 +160,7 @@ class _SharedBudgetState extends State<SharedBudget> {
   // ADD POPUP MENU
   Widget _buildAddMenuOverlay(BuildContext context) {
     return Positioned(
-      bottom: 185,
+      bottom: 132,
       left: 0,
       right: 0,
       child: Center(
@@ -182,7 +182,7 @@ class _SharedBudgetState extends State<SharedBudget> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _popupButton('Add Wallet', const AddWalletPage()),
-              _popupButton('Add User', const AddGroupPage()),
+              _popupButton('Add Group', const AddGroupPage()),
               _popupButton('Add Expenses', const AddExpensePage()),
             ],
           ),

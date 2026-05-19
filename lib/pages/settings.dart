@@ -186,7 +186,7 @@ class _SettingsPageState extends State<SettingsPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildPopUpButton('Add Wallet'),
-              _buildPopUpButton('Add User'),
+              _buildPopUpButton('Add Group'),
               _buildPopUpButton('Add Expenses'),
             ],
           ),

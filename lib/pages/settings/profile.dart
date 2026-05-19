@@ -6,7 +6,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 const Color _darkGreen = Color(0xFF558B6E); 
 const Color _primaryGreen = Color(0xFF0D532E); 
 const Color _saveButtonColor = Color(0xFF4CAF50); 
-const Color _fieldColor = Color(0xFF9EB59A); 
 
 class ProfileSettingsPage extends StatefulWidget {
   const ProfileSettingsPage({super.key});
@@ -25,8 +24,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _contactController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _incomeController = TextEditingController(); 
+  final TextEditingController _emailController = TextEditingController(); 
   
   final String _addressLabel = "Home Address";
   
@@ -37,7 +35,6 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
     _addressController.dispose();
     _contactController.dispose();
     _emailController.dispose();
-    _incomeController.dispose();
     super.dispose();
   }
 
@@ -60,9 +57,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
         _nameController.text = data['name'] ?? 'Name Not Set'; 
         
         _contactController.text = data['phone'] ?? ''; 
-        _addressController.text = data['address'] ?? 'Add your address...';
-        // Ensure income is loaded as String for TextEditingController
-        _incomeController.text = data['income']?.toString() ?? '0'; 
+        _addressController.text = data['address'] ?? 'Add your address...'; 
       } else {
          // Fallback if the Firestore document doesn't exist
         _nameController.text = _currentUser.displayName ?? 'Name Not Found'; 
@@ -95,7 +90,6 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
     final String newName = _nameController.text.trim();
     final String newContact = _contactController.text.trim();
     final String newAddress = _addressController.text.trim();
-    final String newIncomeText = _incomeController.text.trim();
 
 
     try {
@@ -110,8 +104,6 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
           'name': newName,
           'phone': newContact,
           'address': newAddress,
-          // Convert string to double for storage
-          'income': double.tryParse(newIncomeText) ?? 0.0,
           'email': _emailController.text,
           'updatedAt': FieldValue.serverTimestamp(),
         },
@@ -125,7 +117,6 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
           _nameController.text = newName;
           _contactController.text = newContact;
           _addressController.text = newAddress;
-          _incomeController.text = newIncomeText;
           _isEditing = false;
         });
 
@@ -381,16 +372,6 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                         controller: _addressController,
                         label: _addressLabel,
                         icon: Icons.location_on_outlined,
-                      ),
-
-
-                      // Total Income (Editable, fetched from Firestore 'income')
-                      _buildProfileInputField(
-                        controller: _incomeController,
-                        label: 'Total Income (Monthly)',
-                        icon: Icons.payments_outlined,
-                        keyboardType: TextInputType.number,
-                        prefixText: '₱ ', 
                       ),
 
                       // Action Button (Edit / Save Changes)

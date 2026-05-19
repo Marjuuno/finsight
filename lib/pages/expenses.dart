@@ -384,7 +384,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildPopUpButton('Add Wallet'),
-              _buildPopUpButton('Add User'),
+              _buildPopUpButton('Add Group'),
               _buildPopUpButton('Add Expenses'),
             ],
           ),
